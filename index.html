@@ -8,8 +8,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- PeerJS for WebRTC cross-device sync -->
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <!-- MQTT over WebSocket for Cross-Device / School Firewall Bypass Realtime Sync -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -59,8 +59,8 @@
             <span class="opacity-40">|</span>
             <!-- Sync Indicator & Test Button -->
             <button onclick="testSyncConnection()" id="sync-status-indicator" class="flex items-center text-xs text-emerald-300 hover:text-white font-medium bg-indigo-800/80 hover:bg-indigo-900 px-2.5 py-0.5 rounded-lg border border-indigo-500/40 transition cursor-pointer" title="클릭하여 실시간 연동 신호 테스트">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
-              <span id="sync-channel-label">1-3반 동기화 중</span>
+              <span id="sync-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+              <span id="sync-channel-label">1-3반 실시간 연동 중</span>
               <i class="fa-solid fa-rotate ml-1.5 text-[10px] opacity-75"></i>
             </button>
           </div>
@@ -576,7 +576,7 @@
       idleTimer: null,
       schoolName: "대창중학교",
       className: "1학년 3반",
-      selectedTimetableDay: null, // Auto-detected based on today's weekday
+      selectedTimetableDay: null,
       praiseTemp: 75,
       praiseMsg: "목표 달성 시 학급 보상 지급!",
       mealMenu: ["현미밥", "쇠고기미역국", "언양식불고기", "배추김치", "친환경 사과"],
@@ -602,10 +602,9 @@
     // GLOBAL APPLICATION STATE
     let state = JSON.parse(JSON.stringify(defaultState));
 
-    // MULTI-LAYER COMMUNICATION ENGINE (BroadcastChannel + LocalStorage Event + PeerJS)
-    let broadcastChannel = null;
-    let peer = null;
-    let peerConnections = [];
+    // REALTIME MQTT CLIENT OVER WEBSOCKET (WSS - Bypasses School Firewalls & Works Cross-Device)
+    let mqttClient = null;
+    let clientId = 'daechang_' + Math.random().toString(16).substring(2, 10);
     let lastProcessedPacketId = null;
     let audioContext = null;
     let currentOscillator = null;
@@ -614,7 +613,7 @@
       return name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
     }
 
-    // Deep merge saved state with default values to ensure no missing keys
+    // Deep merge saved state with default values
     function mergeStateWithDefaults(saved) {
       if (!saved || typeof saved !== 'object') return JSON.parse(JSON.stringify(defaultState));
 
@@ -634,7 +633,6 @@
         moodLogs: Array.isArray(saved.moodLogs) ? saved.moodLogs : defaultState.moodLogs
       };
 
-      // Ensure all 5 weekdays have an 8-period array
       ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(day => {
         if (!Array.isArray(merged.timetable[day]) || merged.timetable[day].length === 0) {
           merged.timetable[day] = [...defaultState.timetable[day]];
@@ -684,75 +682,66 @@
       }
     }
 
-    // Initialize Auto-Sync System
+    // Initialize MQTT Realtime Communication System
     function initAutoSyncSystem() {
-      if (broadcastChannel) {
-        try { broadcastChannel.close(); } catch(e) {}
-      }
-      peerConnections.forEach(c => { try { c.close(); } catch(e) {} });
-      peerConnections = [];
-      if (peer) {
-        try { peer.destroy(); } catch(e) {}
-      }
-
       const classKey = getClassKey();
-      const channelName = `daechang_sync_${classKey}`;
+      const topic = `daechang_middle_school/class_${classKey}`;
       
       const indicatorLabel = document.getElementById('sync-channel-label');
-      if (indicatorLabel) indicatorLabel.innerText = `${state.className} 동기화 중`;
+      const indicatorDot = document.getElementById('sync-status-dot');
+      
+      if (indicatorLabel) indicatorLabel.innerText = `${state.className} 실시간 연결 중...`;
+      if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-amber-400 mr-1.5 animate-ping";
 
-      // LAYER 1: Native Storage Event (Cross-Tab / Cross-Window)
-      window.removeEventListener('storage', handleStorageEvent);
-      window.addEventListener('storage', handleStorageEvent);
-
-      // LAYER 2: BroadcastChannel API
-      if ('BroadcastChannel' in window) {
-        broadcastChannel = new BroadcastChannel(channelName);
-        broadcastChannel.onmessage = (event) => handleIncomingSyncPacket(event.data);
+      if (mqttClient) {
+        try { mqttClient.end(true); } catch(e) {}
       }
 
-      // LAYER 3: PeerJS P2P WebRTC Network
+      // Public WSS Brokers (Port 8084/443 SSL - Bypass School Firewalls)
+      const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+
       try {
-        const hostPeerId = `daechang-class-${classKey}-host`;
-        peer = new Peer(hostPeerId, {
-          config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
-          debug: 0
+        mqttClient = mqtt.connect(brokerUrl, {
+          clientId: clientId,
+          keepalive: 30,
+          clean: true,
+          reconnectPeriod: 3000,
+          connectTimeout: 10000
         });
 
-        peer.on('connection', (conn) => {
-          peerConnections.push(conn);
-          conn.on('data', (data) => handleIncomingSyncPacket(data));
-          conn.on('close', () => {
-            peerConnections = peerConnections.filter(c => c !== conn);
+        mqttClient.on('connect', () => {
+          if (indicatorLabel) indicatorLabel.innerText = `${state.className} 실시간 연동 완료`;
+          if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse";
+
+          mqttClient.subscribe(topic, { qos: 1 }, (err) => {
+            if (!err) {
+              console.log(`Subscribed to classroom channel: ${topic}`);
+            }
           });
         });
 
-        peer.on('error', (err) => {
-          if (err.type === 'unavailable-id') {
-            const clientPeer = new Peer(null, {
-              config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
-              debug: 0
-            });
-            clientPeer.on('open', () => {
-              const conn = clientPeer.connect(hostPeerId);
-              conn.on('open', () => { peerConnections.push(conn); });
-              conn.on('data', (data) => handleIncomingSyncPacket(data));
-            });
+        mqttClient.on('message', (t, message) => {
+          try {
+            const packet = JSON.parse(message.toString());
+            if (packet.senderId === clientId) return; // Ignore own messages
+            handleIncomingSyncPacket(packet);
+          } catch(err) {
+            console.error("Invalid packet:", err);
           }
         });
-      } catch (e) {
-        console.log("PeerJS fallback activated.");
-      }
-    }
 
-    function handleStorageEvent(e) {
-      if (!e.key) return;
-      const classKey = getClassKey();
-      if (e.key === `daechang_packet_${classKey}` && e.newValue) {
-        try {
-          const packet = JSON.parse(e.newValue);
-          handleIncomingSyncPacket(packet);
-        } catch(err) {}
+        mqttClient.on('error', () => {
+          if (indicatorLabel) indicatorLabel.innerText = `${state.className} 재연결 중...`;
+          if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-rose-400 mr-1.5";
+        });
+
+        mqttClient.on('offline', () => {
+          if (indicatorLabel) indicatorLabel.innerText = `${state.className} 오프라인`;
+          if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-slate-400 mr-1.5";
+        });
+
+      } catch(e) {
+        console.error("MQTT initialization failed:", e);
       }
     }
 
@@ -780,30 +769,23 @@
           }
         }
       } else if (packet.type === 'SYNC_TEST') {
-        showToast(`⚡ [${packet.sender || '연동 기기'}] 실시간 동기화 신호 수신 완료!`);
+        showToast(`⚡ [${packet.sender || '연동 기기'}] 실시간 신호 정상 수신 완료!`);
       }
     }
 
     function dispatchSyncData(packet) {
       const classKey = getClassKey();
-      const payloadWithTs = { ...packet, _ts: Date.now(), _id: Math.random().toString(36).substring(2, 11) };
+      const topic = `daechang_middle_school/class_${classKey}`;
+      const payloadWithMeta = { 
+        ...packet, 
+        senderId: clientId,
+        _ts: Date.now(), 
+        _id: Math.random().toString(36).substring(2, 11) 
+      };
 
-      // 1. Storage Event Dispatch
-      try {
-        localStorage.setItem(`daechang_packet_${classKey}`, JSON.stringify(payloadWithTs));
-      } catch(e) {}
-
-      // 2. BroadcastChannel Dispatch
-      if (broadcastChannel) {
-        try { broadcastChannel.postMessage(payloadWithTs); } catch(e) {}
+      if (mqttClient && mqttClient.connected) {
+        mqttClient.publish(topic, JSON.stringify(payloadWithMeta), { qos: 1 });
       }
-
-      // 3. PeerJS Data Channel Dispatch
-      peerConnections.forEach(conn => {
-        if (conn && conn.open) {
-          try { conn.send(payloadWithTs); } catch(e) {}
-        }
-      });
     }
 
     function testSyncConnection() {
@@ -811,7 +793,7 @@
         type: 'SYNC_TEST',
         sender: state.className
       });
-      showToast(`⚡ [${state.className}] 연동 테스트 신호를 발송했습니다!`);
+      showToast(`⚡ [${state.className}] 실시간 테스트 신호를 전송했습니다!`);
     }
 
     function syncStateToOtherTabs() {
@@ -1079,7 +1061,7 @@
       if (['mon', 'tue', 'wed', 'thu', 'fri'].includes(today)) {
         return today;
       }
-      return 'mon'; // Weekend fallback
+      return 'mon';
     }
 
     function selectStudentTimetableDay(dayKey) {
@@ -1090,10 +1072,8 @@
     function renderTimetable() {
       const activeDay = getCurrentOrSelectedDay();
       const list = (state.timetable && state.timetable[activeDay]) ? state.timetable[activeDay] : defaultState.timetable[activeDay];
-      
       const dayLabels = { mon: "월요일", tue: "화요일", wed: "수요일", thu: "목요일", fri: "금요일" };
       
-      // Highlight Active Weekday Selector Button
       ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
         const btn = document.getElementById(`tt-student-btn-${d}`);
         if (btn) {
@@ -1178,7 +1158,6 @@
       `).join('');
     }
 
-    // Card Resizer Handler
     function changeCardSize(cardDomId, colClass) {
       const card = document.getElementById(cardDomId);
       if (!card) return;
@@ -1190,7 +1169,6 @@
       saveStateLocally(true);
     }
 
-    // Drag and Drop Card Grid
     function setupDragAndDrop() {
       const grid = document.getElementById('card-grid');
       if (!grid) return;
@@ -1381,7 +1359,7 @@
         if (state.currentTab !== 'notifier' && !state.isTeacherAuthenticated) {
           switchTab('notifier');
         }
-      }, 120000); // Auto return to notifier after 2 mins idle
+      }, 120000);
     }
 
     function setupIdleTimer() {
@@ -1390,7 +1368,7 @@
       );
     }
 
-    // APP INITIALIZATION ON WINDOW LOAD
+    // APP INITIALIZATION
     window.onload = function() {
       loadStateLocally();
       initAutoSyncSystem();
