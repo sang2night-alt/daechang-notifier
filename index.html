@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- PeerJS WebRTC Library -->
+  <!-- PeerJS for background cross-device sync -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
   <style>
@@ -21,12 +21,12 @@
     }
     .animate-emergency { animation: emergency-flash 0.8s infinite; }
 
-    .grid-item { transition: transform 0.2s ease; }
+    .grid-item { transition: transform 0.2s ease, box-shadow 0.2s ease; }
     .dragging { opacity: 0.4; transform: scale(0.98); border: 2px dashed #4f46e5; }
     .drag-handle { cursor: grab; }
     .drag-handle:active { cursor: grabbing; }
 
-    /* Grid columns */
+    /* Responsive Grid Columns */
     .col-span-1 { grid-column: span 1 / span 1; }
     .col-span-2 { grid-column: span 2 / span 2; }
     .col-span-3 { grid-column: span 3 / span 3; }
@@ -46,14 +46,20 @@
         <div>
           <div class="flex items-center space-x-2">
             <h1 class="text-lg font-bold tracking-tight">대창중학교</h1>
-            <span id="header-class-badge" class="bg-indigo-800 text-yellow-300 text-xs px-2 py-0.5 rounded font-bold cursor-pointer hover:bg-indigo-900" title="클릭하여 학년/반 수정" onclick="promptEditClass()">1학년 3반</span>
+            <!-- Classroom Selector Button -->
+            <button onclick="openClassSelectModal()" id="header-class-badge" class="bg-indigo-800 hover:bg-indigo-900 text-yellow-300 text-xs px-2.5 py-1 rounded font-extrabold transition flex items-center shadow-inner" title="클릭하여 교실/학급 변경">
+              <i class="fa-solid fa-chalkboard-user mr-1.5 text-yellow-400"></i>
+              <span id="current-class-label">1학년 3반</span>
+              <i class="fa-solid fa-chevron-down ml-1.5 text-[10px] text-indigo-300"></i>
+            </button>
           </div>
-          <div class="flex items-center space-x-2 text-xs text-indigo-200">
+          <div class="flex items-center space-x-2 text-xs text-indigo-200 mt-0.5">
             <span id="current-date-time">--월 --일 (요일) --:--</span>
             <span class="opacity-40">|</span>
-            <!-- P2P Connection Badge -->
-            <span id="p2p-status-badge" class="bg-red-500/80 text-white font-bold px-2 py-0.5 rounded-full flex items-center text-[10px]">
-              <span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-ping"></span> 오프라인
+            <!-- Sync Indicator -->
+            <span id="sync-status-indicator" class="flex items-center text-[11px] text-emerald-300 font-medium" title="실시간 자동 동기화 활성화됨">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+              <span id="sync-channel-label">1-3반 동기화 중</span>
             </span>
           </div>
         </div>
@@ -62,24 +68,19 @@
       <div class="flex items-center space-x-2">
         <!-- Student Mode Nav Buttons -->
         <div id="student-nav" class="flex space-x-1">
-          <button onclick="switchTab('notifier')" id="tab-btn-notifier" class="px-3 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition">
-            <i class="fa-solid fa-bullhorn mr-1"></i> 스마트 알리미
+          <button onclick="switchTab('notifier')" id="tab-btn-notifier" class="px-3.5 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition">
+            <i class="fa-solid fa-bullhorn mr-1.5"></i> 스마트 알리미
           </button>
-          <button onclick="switchTab('meal')" id="tab-btn-meal" class="px-3 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition">
-            <i class="fa-solid fa-utensils mr-1"></i> 급식 식단
+          <button onclick="switchTab('meal')" id="tab-btn-meal" class="px-3.5 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition">
+            <i class="fa-solid fa-utensils mr-1.5"></i> 급식 식단
           </button>
-          <button onclick="switchTab('mood')" id="tab-btn-mood" class="px-3 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition">
-            <i class="fa-solid fa-face-smile mr-1"></i> 오늘의 기분
+          <button onclick="switchTab('mood')" id="tab-btn-mood" class="px-3.5 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition">
+            <i class="fa-solid fa-face-smile mr-1.5"></i> 오늘의 기분
           </button>
         </div>
 
-        <!-- PeerJS Config Button -->
-        <button onclick="openP2PModal()" class="px-2.5 py-1.5 text-xs font-bold bg-indigo-900/60 hover:bg-indigo-900 text-indigo-200 rounded-lg transition flex items-center">
-          <i class="fa-solid fa-network-wired mr-1 text-cyan-400"></i> P2P 연결
-        </button>
-
         <!-- Mode Toggle Button -->
-        <button onclick="toggleTeacherMode()" id="mode-toggle-btn" class="ml-1 px-3 py-1.5 text-sm rounded-lg font-bold bg-amber-400 hover:bg-amber-500 text-slate-900 shadow transition flex items-center">
+        <button onclick="toggleTeacherMode()" id="mode-toggle-btn" class="ml-2 px-3.5 py-1.5 text-sm rounded-lg font-bold bg-amber-400 hover:bg-amber-500 text-slate-900 shadow transition flex items-center">
           <i class="fa-solid fa-lock mr-1.5"></i> <span id="mode-btn-text">교사 모드</span>
         </button>
       </div>
@@ -103,7 +104,7 @@
                 <i class="fa-solid fa-calendar-days text-indigo-600 mr-2"></i> 오늘의 시간표 (1~8교시)
               </h2>
               <div class="flex items-center space-x-2">
-                <select onchange="changeCardSize('card-timetable', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded px-2 py-1 font-medium text-slate-600">
+                <select onchange="changeCardSize('card-timetable', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded-lg px-2 py-1 font-medium text-slate-600 outline-none">
                   <option value="col-span-1" selected>1칸 (기본)</option>
                   <option value="col-span-2">2칸 (넓게)</option>
                   <option value="col-span-3">3칸 (전체)</option>
@@ -125,7 +126,7 @@
                 <i class="fa-solid fa-list-check text-emerald-600 mr-2"></i> 오늘 꼭 해야 할 일
               </h2>
               <div class="flex items-center space-x-2">
-                <select onchange="changeCardSize('card-todo', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded px-2 py-1 font-medium text-slate-600">
+                <select onchange="changeCardSize('card-todo', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded-lg px-2 py-1 font-medium text-slate-600 outline-none">
                   <option value="col-span-1" selected>1칸 (기본)</option>
                   <option value="col-span-2">2칸 (넓게)</option>
                   <option value="col-span-3">3칸 (전체)</option>
@@ -147,7 +148,7 @@
                 <i class="fa-solid fa-temperature-full text-rose-500 mr-2"></i> 우리반 칭찬 온도계
               </h2>
               <div class="flex items-center space-x-2">
-                <select onchange="changeCardSize('card-praise', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded px-2 py-1 font-medium text-slate-600">
+                <select onchange="changeCardSize('card-praise', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded-lg px-2 py-1 font-medium text-slate-600 outline-none">
                   <option value="col-span-1" selected>1칸 (기본)</option>
                   <option value="col-span-2">2칸 (넓게)</option>
                   <option value="col-span-3">3칸 (전체)</option>
@@ -189,12 +190,12 @@
       </div>
     </section>
 
-    <!-- ENHANCED STUDENT MOOD VIEW -->
+    <!-- STUDENT MOOD VIEW -->
     <section id="view-mood" class="hidden space-y-6">
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto">
         <div class="text-center mb-6">
           <h2 class="text-2xl font-bold text-slate-800 mb-1">오늘 나의 기분은 어떤가요?</h2>
-          <p class="text-slate-500 text-sm">마음 상태와 사유를 기록해 주세요. (선생님만 볼 수 있습니다)</p>
+          <p class="text-slate-500 text-sm">현재 교실: <span class="font-bold text-indigo-600" id="mood-view-class-label">1학년 3반</span> (담임선생님만 볼 수 있습니다)</p>
         </div>
 
         <!-- Student Info Form -->
@@ -233,24 +234,33 @@
     <section id="view-teacher" class="hidden space-y-6">
       <div class="bg-slate-800 text-white p-5 rounded-2xl shadow-md flex flex-wrap justify-between items-center gap-3">
         <div>
-          <h2 class="text-xl font-bold flex items-center">
-            <i class="fa-solid fa-user-shield text-amber-400 mr-2"></i> 대창중학교 교사 전용 대시보드
-          </h2>
-          <p class="text-xs text-slate-300 mt-1">실시간 호출, 학급 시간표, 급식, 할 일 및 학생 기분을 관리합니다.</p>
+          <div class="flex items-center space-x-2">
+            <h2 class="text-xl font-bold flex items-center">
+              <i class="fa-solid fa-user-shield text-amber-400 mr-2"></i> 대창중학교 교사 전용 대시보드
+            </h2>
+            <span class="bg-amber-400 text-slate-900 font-extrabold text-xs px-2.5 py-0.5 rounded-full" id="teacher-current-class-badge">1학년 3반 관리 중</span>
+          </div>
+          <p class="text-xs text-slate-300 mt-1">교실 선택, 실시간 호출, 학급 시간표, 급식, 할 일 및 학생 기분을 관리합니다.</p>
         </div>
-        <button onclick="switchTab('notifier')" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
-          <i class="fa-solid fa-right-from-bracket mr-1"></i> 학생 화면으로
-        </button>
+        
+        <div class="flex items-center space-x-2">
+          <button onclick="openClassSelectModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2 rounded-lg transition font-bold flex items-center">
+            <i class="fa-solid fa-arrows-rotate mr-1.5"></i> 교실 전환
+          </button>
+          <button onclick="switchTab('notifier')" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition">
+            <i class="fa-solid fa-right-from-bracket mr-1"></i> 학생 화면으로
+          </button>
+        </div>
       </div>
 
       <!-- REAL-TIME MOOD MONITOR BOARD -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
         <div class="flex justify-between items-center pb-2 border-b border-slate-100">
           <h3 class="text-lg font-bold text-slate-800 flex items-center">
-            <i class="fa-solid fa-heart-pulse text-rose-500 mr-2"></i> 실시간 학생 기분/마음 현황판
+            <i class="fa-solid fa-heart-pulse text-rose-500 mr-2"></i> 실시간 학생 기분/마음 현황판 (<span id="mood-board-class-name">1학년 3반</span>)
           </h3>
           <button onclick="clearMoodLogs()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1 rounded font-medium">
-            기록 초기화
+            이 학급 기록 초기화
           </button>
         </div>
 
@@ -276,7 +286,7 @@
         <!-- School Class Config -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
           <h3 class="text-lg font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
-            <i class="fa-solid fa-school-flag text-indigo-600 mr-2"></i> 학교 및 학급 설정
+            <i class="fa-solid fa-school-flag text-indigo-600 mr-2"></i> 학급 정보 설정
           </h3>
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -284,8 +294,8 @@
               <input type="text" id="school-name-input" value="대창중학교" disabled class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2 text-sm text-slate-500">
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">학년 / 반 표시</label>
-              <input type="text" id="school-class-input" value="1학년 3반" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">현재 학급 명칭</label>
+              <input type="text" id="school-class-input" value="1학년 3반" class="w-full border border-slate-300 rounded-lg p-2 text-sm font-bold text-indigo-700">
             </div>
           </div>
           <button onclick="saveClassInfo()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-sm transition">
@@ -317,7 +327,7 @@
       <!-- CALL CONTROL CENTER -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
         <h3 class="text-lg font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
-          <i class="fa-solid fa-bell text-indigo-600 mr-2"></i> 학생 호출 및 긴급 알림 제어
+          <i class="fa-solid fa-bell text-indigo-600 mr-2"></i> 학생 호출 및 긴급 알림 제어 (<span id="call-target-class-name">1학년 3반</span>)
         </h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -352,7 +362,7 @@
               <h4 class="font-bold text-rose-900 text-sm flex items-center mb-2">
                 <i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1.5"></i> 긴급 경보 호출
               </h4>
-              <p class="text-xs text-rose-700 mb-3">전체 학생 태블릿에 빨간색 점멸 화면과 경보 사이렌을 송출합니다.</p>
+              <p class="text-xs text-rose-700 mb-3">현재 선택된 교실(<span class="font-bold" id="emergency-target-class-label">1학년 3반</span>) 태블릿에 점멸 화면과 경보 사이렌을 송출합니다.</p>
               <input type="text" id="emergency-reason" placeholder="긴급 알림 메시지" class="w-full text-sm border border-rose-300 rounded-lg p-2 focus:ring-2 focus:ring-rose-500 outline-none mb-3">
             </div>
             <button onclick="sendStudentCall(true)" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-sm animate-pulse">
@@ -370,7 +380,7 @@
             <h3 class="text-lg font-bold text-slate-800 flex items-center">
               <i class="fa-solid fa-pen-to-square text-indigo-600 mr-2"></i> 시간표 관리 (1~8교시)
             </h3>
-            <select id="timetable-day-select" onchange="loadDayTimetableEditor()" class="text-xs bg-slate-100 border border-slate-300 rounded px-2 py-1 font-bold">
+            <select id="timetable-day-select" onchange="loadDayTimetableEditor()" class="text-xs bg-slate-100 border border-slate-300 rounded-lg px-2 py-1 font-bold outline-none">
               <option value="mon">월요일</option>
               <option value="tue">화요일</option>
               <option value="wed">수요일</option>
@@ -427,6 +437,59 @@
 
   </main>
 
+  <!-- CLASSROOM SELECTION MODAL -->
+  <div id="class-select-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 border border-indigo-100">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="text-xl font-bold text-slate-800 flex items-center">
+          <i class="fa-solid fa-chalkboard-user text-indigo-600 mr-2"></i> 접속 교실/학급 선택
+        </h3>
+        <button onclick="closeClassSelectModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500">
+        접속하고자 하는 학년과 반을 선택하세요. 각 교실마다 고유 시간표, 할 일, 칭찬 온도계 및 실시간 알림 채널이 독립 연결됩니다.
+      </p>
+
+      <!-- Quick Grade Selector Tabs -->
+      <div class="space-y-3">
+        <div>
+          <span class="text-xs font-bold text-indigo-600 uppercase">1학년</span>
+          <div class="grid grid-cols-5 gap-2 mt-1" id="class-buttons-grade-1">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <div>
+          <span class="text-xs font-bold text-indigo-600 uppercase">2학년</span>
+          <div class="grid grid-cols-5 gap-2 mt-1" id="class-buttons-grade-2">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <div>
+          <span class="text-xs font-bold text-indigo-600 uppercase">3학년</span>
+          <div class="grid grid-cols-5 gap-2 mt-1" id="class-buttons-grade-3">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Class Name Input -->
+      <div class="pt-3 border-t border-slate-100">
+        <label class="block text-xs font-bold text-slate-600 mb-1">직접 학급명 입력 (예: 특별실 / 동아리실)</label>
+        <div class="flex space-x-2">
+          <input type="text" id="custom-class-input" placeholder="예: 1학년 6반, 음악실" class="flex-1 text-sm border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-indigo-500">
+          <button onclick="applyCustomClassroom()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 rounded-xl text-sm transition">
+            선택 완료
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- CALL ALERT MODAL -->
   <div id="call-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
     <div id="call-modal-card" class="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl transform transition-all border-4 border-indigo-500">
@@ -460,54 +523,10 @@
     </div>
   </div>
 
-  <!-- PEERJS CONFIGURATION MODAL -->
-  <div id="p2p-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-    <div class="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h3 class="text-lg font-bold text-slate-800 flex items-center">
-          <i class="fa-solid fa-network-wired text-indigo-600 mr-2"></i> PeerJS 실시간 P2P 연결
-        </h3>
-        <button onclick="closeP2PModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-      </div>
-
-      <div class="space-y-4 text-sm">
-        <div>
-          <label class="block text-xs font-bold text-slate-600 mb-1">기기 역할 선택</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="p2p-role-classroom-btn" onclick="setP2PRole('classroom')" class="p-3 border-2 border-indigo-600 rounded-xl font-bold bg-indigo-50 text-indigo-700 text-xs">
-              📱 교실 태블릿 (수신)
-            </button>
-            <button id="p2p-role-office-btn" onclick="setP2PRole('office')" class="p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 text-xs">
-              💻 교무실 PC (발신)
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-600 mb-1">학급 연결 코드 (공통)</label>
-          <input type="text" id="p2p-code-input" value="daechang-1-3" placeholder="예: daechang-1-3" class="w-full border border-slate-300 rounded-xl p-2.5 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
-          <p class="text-[11px] text-slate-400 mt-1">같은 학급의 교실 태블릿과 교무실 PC는 동일한 코드를 입력해야 합니다.</p>
-        </div>
-
-        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
-          <div class="flex justify-between">
-            <span class="text-slate-500">내 Peer ID:</span>
-            <span id="p2p-my-id" class="font-mono font-bold text-indigo-600">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-500">연결 상대 ID:</span>
-            <span id="p2p-target-id" class="font-mono font-bold text-slate-700">-</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex space-x-2">
-        <button onclick="closeP2PModal()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm">닫기</button>
-        <button onclick="connectPeerJS()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm shadow">
-          P2P 재연결 시도
-        </button>
-      </div>
-    </div>
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-notification" class="fixed bottom-5 right-5 z-50 flex items-center space-x-2.5 bg-emerald-600 text-white font-bold px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-200 text-xl"></i>
+    <span id="toast-message" class="text-sm">성공적으로 저장되었습니다.</span>
   </div>
 
   <script>
@@ -518,7 +537,7 @@
       currentTab: "notifier",
       idleTimer: null,
       schoolName: "대창중학교",
-      className: "1학년 3반",
+      className: "1학년 3반", // Default active classroom
       praiseTemp: 75,
       praiseMsg: "목표 달성 시 학급 보상 지급!",
       mealMenu: ["현미밥", "쇠고기미역국", "언양식불고기", "배추김치", "친환경 사과"],
@@ -542,19 +561,108 @@
       moodLogs: []
     };
 
-    // PeerJS & WebRTC State
+    // Seamless Multi-device / Tab Synchronization Logic (Classroom Channel Isolated)
+    let broadcastChannel = null;
     let peer = null;
-    let peerConn = null;
-    let p2pRole = "classroom"; // 'classroom' or 'office'
-    let p2pCode = "daechang-1-3";
+    let peerConnections = [];
 
-    // Audio Context Loop System
+    function getClassKey(name = state.className) {
+      return name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
+    }
+
+    function initAutoSyncSystem() {
+      // Clean up previous connections if switching classrooms
+      if (broadcastChannel) {
+        try { broadcastChannel.close(); } catch(e) {}
+      }
+      peerConnections.forEach(c => { try { c.close(); } catch(e) {} });
+      peerConnections = [];
+      if (peer) {
+        try { peer.destroy(); } catch(e) {}
+      }
+
+      const classKey = getClassKey();
+      const channelName = `daechang_sync_${classKey}`;
+      
+      // Update UI channel badge
+      document.getElementById('sync-channel-label').innerText = `${state.className} 실시간 연동`;
+
+      // 1. BroadcastChannel setup for same device tabs
+      if ('BroadcastChannel' in window) {
+        broadcastChannel = new BroadcastChannel(channelName);
+        broadcastChannel.onmessage = (event) => handleIncomingSyncPacket(event.data);
+      }
+
+      // 2. PeerJS for Cross-device Classroom Sync
+      try {
+        const hostPeerId = `daechang-class-${classKey}-host`;
+        peer = new Peer(hostPeerId, {
+          config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
+          debug: 0
+        });
+
+        peer.on('connection', (conn) => {
+          peerConnections.push(conn);
+          conn.on('data', (data) => handleIncomingSyncPacket(data));
+          conn.on('close', () => {
+            peerConnections = peerConnections.filter(c => c !== conn);
+          });
+        });
+
+        peer.on('error', (err) => {
+          if (err.type === 'unavailable-id') {
+            const clientPeer = new Peer(null, {
+              config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
+              debug: 0
+            });
+            clientPeer.on('open', () => {
+              const conn = clientPeer.connect(hostPeerId);
+              conn.on('open', () => { peerConnections.push(conn); });
+              conn.on('data', (data) => handleIncomingSyncPacket(data));
+            });
+          }
+        });
+      } catch (e) {
+        console.log("Background Peer Sync initialized in local mode.");
+      }
+    }
+
+    function handleIncomingSyncPacket(packet) {
+      if (!packet) return;
+      if (packet.type === 'CALL_SIGNAL') {
+        showCallModal(packet.target, packet.reason, packet.isEmergency);
+      } else if (packet.type === 'STATE_UPDATE') {
+        if (packet.payload) {
+          Object.assign(state, packet.payload);
+          saveStateLocally();
+          renderAll();
+        }
+      } else if (packet.type === 'MOOD_SUBMIT') {
+        if (packet.payload) {
+          state.moodLogs.unshift(packet.payload);
+          saveStateLocally();
+          renderMoodLogTable();
+        }
+      }
+    }
+
+    function dispatchSyncData(packet) {
+      if (broadcastChannel) {
+        broadcastChannel.postMessage(packet);
+      }
+      localStorage.setItem(`daechang_packet_${getClassKey()}`, JSON.stringify({ ...packet, _ts: Date.now() }));
+
+      peerConnections.forEach(conn => {
+        if (conn && conn.open) conn.send(packet);
+      });
+    }
+
+    // Audio Alert System
     let audioCtx = null;
     let audioLoopInterval = null;
 
     function playLoopingSound(isEmergency = false) {
-      stopLoopingSound(); // Ensure previous loops are stopped
-
+      stopLoopingSound();
       try {
         if (!audioCtx) {
           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -596,7 +704,7 @@
         triggerBeep();
         audioLoopInterval = setInterval(triggerBeep, isEmergency ? 800 : 1200);
       } catch (e) {
-        console.log("Audio play error", e);
+        console.log("Audio alert system error", e);
       }
     }
 
@@ -612,117 +720,18 @@
       closeCallModal();
     }
 
-    function initPeerJS() {
-      if (peer) {
-        peer.destroy();
-      }
-
-      const cleanCode = p2pCode.trim() || "daechang-1-3";
-      const myPeerId = p2pRole === "classroom" ? `${cleanCode}-classroom` : `${cleanCode}-office`;
-      const targetPeerId = p2pRole === "classroom" ? `${cleanCode}-office` : `${cleanCode}-classroom`;
-
-      document.getElementById('p2p-my-id').innerText = myPeerId;
-      document.getElementById('p2p-target-id').innerText = targetPeerId;
-
-      // Public STUN/TURN Ice Servers configuration
-      peer = new Peer(myPeerId, {
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' }
-          ]
-        },
-        debug: 1
-      });
-
-      peer.on('open', (id) => {
-        console.log("PeerJS Connected with ID:", id);
-        updateP2PBadge(false);
-        if (p2pRole === 'office') {
-          connectToTargetPeer(targetPeerId);
-        }
-      });
-
-      peer.on('connection', (conn) => {
-        peerConn = conn;
-        setupConnectionEvents();
-      });
-
-      peer.on('error', (err) => {
-        console.warn("PeerJS Error:", err);
-        updateP2PBadge(false);
-      });
-    }
-
-    function connectToTargetPeer(targetId) {
-      if (!peer) return;
-      peerConn = peer.connect(targetId, { reliable: true });
-      setupConnectionEvents();
-    }
-
-    function setupConnectionEvents() {
-      if (!peerConn) return;
-
-      peerConn.on('open', () => {
-        console.log("P2P Connection Established!");
-        updateP2PBadge(true);
-      });
-
-      peerConn.on('data', (data) => {
-        handleIncomingP2PData(data);
-      });
-
-      peerConn.on('close', () => {
-        updateP2PBadge(false);
-      });
-
-      peerConn.on('error', () => {
-        updateP2PBadge(false);
-      });
-    }
-
-    function updateP2PBadge(isConnected) {
-      const badge = document.getElementById('p2p-status-badge');
-      if (isConnected) {
-        badge.className = "bg-emerald-500 text-white font-bold px-2 py-0.5 rounded-full flex items-center text-[10px]";
-        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse"></span> 실시간 연결됨`;
-      } else {
-        badge.className = "bg-red-500/80 text-white font-bold px-2 py-0.5 rounded-full flex items-center text-[10px]";
-        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-ping"></span> 오프라인`;
-      }
-    }
-
-    function sendP2PData(payload) {
-      if (peerConn && peerConn.open) {
-        peerConn.send(payload);
-      }
-    }
-
-    function handleIncomingP2PData(data) {
-      if (!data || !data.type) return;
-
-      if (data.type === 'CALL_SIGNAL') {
-        showCallModal(data.target, data.reason, data.isEmergency);
-      } else if (data.type === 'MOOD_SUBMIT') {
-        state.moodLogs.unshift(data.payload);
-        saveState();
-        renderMoodLogTable();
-      } else if (data.type === 'STATE_UPDATE') {
-        Object.assign(state, data.payload);
-        renderAll();
-      }
-    }
-
     window.onload = function() {
       updateDateTime();
       setInterval(updateDateTime, 1000);
-      loadState();
+      
+      // Load last selected active classroom or default
+      const lastClass = localStorage.getItem('daechang_active_classroom') || "1학년 3반";
+      selectClassroom(lastClass, false);
+
       applyCardSettings();
       setupDragAndDrop();
-      renderAll();
       setupIdleTimer();
-      initPeerJS();
+      renderClassSelectModalGrid();
     };
 
     function updateDateTime() {
@@ -733,8 +742,10 @@
       document.getElementById('meal-date-display').innerText = `${now.getMonth()+1}월 ${now.getDate()}일 급식 식단`;
     }
 
-    function saveState() {
-      localStorage.setItem('daechang_notifier_state', JSON.stringify({
+    // Per-Classroom State Local Storage
+    function saveStateLocally() {
+      const storageKey = `daechang_notifier_state_${getClassKey()}`;
+      localStorage.setItem(storageKey, JSON.stringify({
         className: state.className,
         praiseTemp: state.praiseTemp,
         praiseMsg: state.praiseMsg,
@@ -745,22 +756,86 @@
         cardSizes: state.cardSizes,
         moodLogs: state.moodLogs
       }));
+      localStorage.setItem('daechang_active_classroom', state.className);
     }
 
     function loadState() {
-      const saved = localStorage.getItem('daechang_notifier_state');
+      const storageKey = `daechang_notifier_state_${getClassKey()}`;
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        state.className = parsed.className ?? "1학년 3반";
+        state.className = parsed.className ?? state.className;
         state.praiseTemp = parsed.praiseTemp ?? 75;
         state.praiseMsg = parsed.praiseMsg ?? "목표 달성 시 학급 보상 지급!";
-        state.mealMenu = parsed.mealMenu ?? state.mealMenu;
-        state.todos = parsed.todos ?? state.todos;
-        state.timetable = parsed.timetable ?? state.timetable;
-        state.cardOrder = parsed.cardOrder ?? state.cardOrder;
-        state.cardSizes = parsed.cardSizes ?? state.cardSizes;
+        state.mealMenu = parsed.mealMenu ?? ["현미밥", "쇠고기미역국", "언양식불고기", "배추김치", "친환경 사과"];
+        state.todos = parsed.todos ?? [
+          { id: 1, text: "수학 익힘책 제출", done: false },
+          { id: 2, text: "구글 클래스룸 과제 확인", done: false }
+        ];
+        state.timetable = parsed.timetable ?? {
+          mon: ["국어", "수학", "영어", "사회", "과학", "체육", "자율", "동아리"],
+          tue: ["수학", "국어", "음악", "미술", "미술", "동아리", "창체", "진로"],
+          wed: ["영어", "수학", "국어", "도덕", "사회", "자율", "과학", "체육"],
+          thu: ["과학", "국어", "수학", "체육", "영어", "역사", "미술", "음악"],
+          fri: ["사회", "수학", "국어", "음악", "기술가정", "학급회의", "동아리", "창체"]
+        };
+        state.cardOrder = parsed.cardOrder ?? ["timetable", "todo", "praise"];
+        state.cardSizes = parsed.cardSizes ?? { timetable: "col-span-1", todo: "col-span-1", praise: "col-span-1" };
         state.moodLogs = parsed.moodLogs ?? [];
+      } else {
+        // Default initial reset for new class
+        state.praiseTemp = 75;
+        state.praiseMsg = "목표 달성 시 학급 보상 지급!";
+        state.moodLogs = [];
       }
+    }
+
+    // CLASSROOM SELECTION LOGIC
+    function openClassSelectModal() {
+      document.getElementById('class-select-modal').classList.remove('hidden');
+    }
+
+    function closeClassSelectModal() {
+      document.getElementById('class-select-modal').classList.add('hidden');
+    }
+
+    function selectClassroom(className, shouldSync = true) {
+      state.className = className;
+      loadState();
+      initAutoSyncSystem();
+      renderAll();
+      closeClassSelectModal();
+
+      if (shouldSync) {
+        saveStateLocally();
+      }
+    }
+
+    function applyCustomClassroom() {
+      const val = document.getElementById('custom-class-input').value.trim();
+      if (!val) {
+        showToast("학급 명칭을 입력하세요.", true);
+        return;
+      }
+      selectClassroom(val);
+      document.getElementById('custom-class-input').value = '';
+    }
+
+    function renderClassSelectModalGrid() {
+      [1, 2, 3].forEach(grade => {
+        const container = document.getElementById(`class-buttons-grade-${grade}`);
+        if (!container) return;
+        let html = '';
+        for (let room = 1; room <= 5; room++) {
+          const name = `${grade}학년 ${room}반`;
+          html += `
+            <button onclick="selectClassroom('${name}')" class="py-2 text-xs font-bold rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-600 hover:text-white transition shadow-sm">
+              ${room}반
+            </button>
+          `;
+        }
+        container.innerHTML = html;
+      });
     }
 
     function applyCardSettings() {
@@ -787,18 +862,16 @@
       
       const dataId = card.getAttribute('data-id');
       state.cardSizes[dataId] = colClass;
-      saveState();
+      saveStateLocally();
     }
 
-    // HTML5 Drag and Drop functionality
+    // Drag and Drop
     function setupDragAndDrop() {
       const grid = document.getElementById('card-grid');
       const cards = grid.querySelectorAll('.grid-item');
 
       cards.forEach(card => {
-        card.addEventListener('dragstart', () => {
-          card.classList.add('dragging');
-        });
+        card.addEventListener('dragstart', () => card.classList.add('dragging'));
         card.addEventListener('dragend', () => {
           card.classList.remove('dragging');
           saveCardOrder();
@@ -834,7 +907,7 @@
       const grid = document.getElementById('card-grid');
       const currentOrder = [...grid.querySelectorAll('.grid-item')].map(card => card.getAttribute('data-id'));
       state.cardOrder = currentOrder;
-      saveState();
+      saveStateLocally();
     }
 
     function switchTab(tab) {
@@ -845,19 +918,19 @@
       document.getElementById('view-mood').classList.add('hidden');
       document.getElementById('view-teacher').classList.add('hidden');
 
-      document.getElementById('tab-btn-notifier').className = "px-3 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition";
-      document.getElementById('tab-btn-meal').className = "px-3 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition";
-      document.getElementById('tab-btn-mood').className = "px-3 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition";
+      document.getElementById('tab-btn-notifier').className = "px-3.5 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition";
+      document.getElementById('tab-btn-meal').className = "px-3.5 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition";
+      document.getElementById('tab-btn-mood').className = "px-3.5 py-1.5 text-sm rounded-lg font-semibold text-indigo-100 hover:bg-indigo-600 transition";
 
       if (tab === 'notifier') {
         document.getElementById('view-notifier').classList.remove('hidden');
-        document.getElementById('tab-btn-notifier').className = "px-3 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition";
+        document.getElementById('tab-btn-notifier').className = "px-3.5 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition";
       } else if (tab === 'meal') {
         document.getElementById('view-meal').classList.remove('hidden');
-        document.getElementById('tab-btn-meal').className = "px-3 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition";
+        document.getElementById('tab-btn-meal').className = "px-3.5 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition";
       } else if (tab === 'mood') {
         document.getElementById('view-mood').classList.remove('hidden');
-        document.getElementById('tab-btn-mood').className = "px-3 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition";
+        document.getElementById('tab-btn-mood').className = "px-3.5 py-1.5 text-sm rounded-lg font-semibold bg-white text-indigo-700 shadow-sm transition";
       } else if (tab === 'teacher') {
         document.getElementById('view-teacher').classList.remove('hidden');
       }
@@ -890,44 +963,8 @@
         closePinModal();
         switchTab('teacher');
       } else {
-        alert("비밀번호가 올바르지 않습니다.");
+        showToast("비밀번호가 올바르지 않습니다.", true);
       }
-    }
-
-    function promptEditClass() {
-      if (!state.isTeacher) {
-        toggleTeacherMode();
-        return;
-      }
-      switchTab('teacher');
-    }
-
-    function openP2PModal() {
-      document.getElementById('p2p-modal').classList.remove('hidden');
-    }
-
-    function closeP2PModal() {
-      document.getElementById('p2p-modal').classList.add('hidden');
-    }
-
-    function setP2PRole(role) {
-      p2pRole = role;
-      const classBtn = document.getElementById('p2p-role-classroom-btn');
-      const officeBtn = document.getElementById('p2p-role-office-btn');
-
-      if (role === 'classroom') {
-        classBtn.className = "p-3 border-2 border-indigo-600 rounded-xl font-bold bg-indigo-50 text-indigo-700 text-xs";
-        officeBtn.className = "p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 text-xs";
-      } else {
-        officeBtn.className = "p-3 border-2 border-indigo-600 rounded-xl font-bold bg-indigo-50 text-indigo-700 text-xs";
-        classBtn.className = "p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 text-xs";
-      }
-    }
-
-    function connectPeerJS() {
-      p2pCode = document.getElementById('p2p-code-input').value.trim();
-      initPeerJS();
-      closeP2PModal();
     }
 
     function setReason(reason) {
@@ -935,14 +972,14 @@
     }
 
     function sendStudentCall(isEmergency = false) {
-      const target = isEmergency ? "🚨 전체 긴급 수신" : (document.getElementById('call-target').value || "전체 학생");
+      const target = isEmergency ? `🚨 [${state.className}] 전체 긴급 수신` : (document.getElementById('call-target').value || "전체 학생");
       const reason = isEmergency ? (document.getElementById('emergency-reason').value || "즉시 선생님을 주시하세요!") : (document.getElementById('call-reason').value || "선생님 호출입니다.");
       
-      // Trigger locally
+      // Local display
       showCallModal(target, reason, isEmergency);
 
-      // Send via PeerJS P2P
-      sendP2PData({
+      // Broadcast to connected classroom devices only
+      dispatchSyncData({
         type: 'CALL_SIGNAL',
         target: target,
         reason: reason,
@@ -981,51 +1018,72 @@
       const reason = document.getElementById('mood-reason-text').value.trim();
 
       if (!info) {
-        alert("학생 번호와 이름을 입력하세요.");
+        showToast("학생 번호와 이름을 입력하세요.", true);
         return;
       }
 
       const now = new Date();
-      const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-      const moodPayload = {
-        time: timestamp,
-        student: info,
-        emoji: emoji,
-        reason: reason || "사유 없음"
-      };
-
-      // Save locally
-      state.moodLogs.unshift(moodPayload);
-      saveState();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const logEntry = { time: timeStr, student: info, emoji: emoji, reason: reason || "-" };
+      
+      state.moodLogs.unshift(logEntry);
+      saveStateLocally();
       renderMoodLogTable();
 
-      // Send to Teacher via P2P
-      sendP2PData({
+      dispatchSyncData({
         type: 'MOOD_SUBMIT',
-        payload: moodPayload
+        payload: logEntry
       });
 
-      // Show Feedback
-      const fb = document.getElementById('mood-feedback');
-      fb.classList.remove('hidden');
-      setTimeout(() => fb.classList.add('hidden'), 3000);
-
       document.getElementById('mood-reason-text').value = '';
-      resetIdleTimer();
+      const feedback = document.getElementById('mood-feedback');
+      if (feedback) {
+        feedback.classList.remove('hidden');
+        setTimeout(() => feedback.classList.add('hidden'), 3000);
+      }
+      showToast("마음이 성공적으로 전달되었습니다! 💌");
+    }
+
+    // Toast Notification Feedback System
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast-notification');
+      const toastMsg = document.getElementById('toast-message');
+      const toastIcon = document.getElementById('toast-icon');
+      if (!toast || !toastMsg) return;
+
+      toastMsg.innerText = message;
+      if (isError) {
+        toast.className = "fixed bottom-5 right-5 z-50 flex items-center space-x-2.5 bg-rose-600 text-white font-bold px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-0 opacity-100 pointer-events-auto";
+        toastIcon.className = "fa-solid fa-circle-exclamation text-yellow-300 text-xl";
+      } else {
+        toast.className = "fixed bottom-5 right-5 z-50 flex items-center space-x-2.5 bg-emerald-600 text-white font-bold px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-0 opacity-100 pointer-events-auto";
+        toastIcon.className = "fa-solid fa-circle-check text-emerald-200 text-xl";
+      }
+
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => {
+        toast.className = "fixed bottom-5 right-5 z-50 flex items-center space-x-2.5 bg-emerald-600 text-white font-bold px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none";
+      }, 2500);
     }
 
     function clearMoodLogs() {
-      if (confirm("기분 기록을 초기화하시겠습니까?")) {
+      if (confirm(`${state.className}의 기분 기록을 초기화하시겠습니까?`)) {
         state.moodLogs = [];
-        saveState();
+        saveStateLocally();
         renderMoodLogTable();
       }
     }
 
     function renderAll() {
-      document.getElementById('header-class-badge').innerText = state.className;
+      // Labels update
+      document.getElementById('current-class-label').innerText = state.className;
       document.getElementById('school-class-input').value = state.className;
+      document.getElementById('mood-view-class-label').innerText = state.className;
+      document.getElementById('teacher-current-class-badge').innerText = `${state.className} 관리 중`;
+      document.getElementById('mood-board-class-name').innerText = state.className;
+      document.getElementById('call-target-class-name').innerText = state.className;
+      document.getElementById('emergency-target-class-label').innerText = state.className;
+
       renderTimetable();
       renderMealMenu();
       renderTodos();
@@ -1081,13 +1139,15 @@
       document.getElementById('praise-temp-display').innerText = state.praiseTemp;
       document.getElementById('praise-bar-display').style.width = `${state.praiseTemp}%`;
       document.getElementById('praise-msg-display').innerText = state.praiseMsg;
+      document.getElementById('praise-temp-input').value = state.praiseTemp;
+      document.getElementById('praise-msg-input').value = state.praiseMsg;
     }
 
     function renderMoodLogTable() {
       const container = document.getElementById('teacher-mood-log-table');
       if (!container) return;
       if (state.moodLogs.length === 0) {
-        container.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400 text-xs">접수된 학생 마음 기록이 없습니다.</td></tr>`;
+        container.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400 text-xs">${state.className}에 접수된 학생 마음 기록이 없습니다.</td></tr>`;
         return;
       }
       container.innerHTML = state.moodLogs.map(log => `
@@ -1100,13 +1160,16 @@
       `).join('');
     }
 
-    // Teacher Editor Controls
+    // Teacher Management Handlers
     function saveClassInfo() {
-      state.className = document.getElementById('school-class-input').value || "1학년 3반";
-      saveState();
+      const newName = document.getElementById('school-class-input').value.trim();
+      if (!newName) return;
+      state.className = newName;
+      saveStateLocally();
+      initAutoSyncSystem();
       renderAll();
-      syncStateToPeer();
-      alert("학급 정보가 저장되었습니다.");
+      syncStateToOtherTabs();
+      showToast("학급 정보가 성공적으로 변경되었습니다.");
     }
 
     function addTodoItem() {
@@ -1115,21 +1178,23 @@
       if (!text) return;
       state.todos.push({ id: Date.now(), text: text, done: false });
       input.value = '';
-      saveState(); renderTodos(); renderTodoEditor();
-      syncStateToPeer();
+      saveStateLocally(); renderTodos(); renderTodoEditor();
+      syncStateToOtherTabs();
+      showToast("할 일이 추가되었습니다. 📝");
     }
 
     function toggleTodo(id) {
       const item = state.todos.find(t => t.id === id);
       if (item) item.done = !item.done;
-      saveState(); renderTodos(); renderTodoEditor();
-      syncStateToPeer();
+      saveStateLocally(); renderTodos(); renderTodoEditor();
+      syncStateToOtherTabs();
     }
 
     function deleteTodo(id) {
       state.todos = state.todos.filter(t => t.id !== id);
-      saveState(); renderTodos(); renderTodoEditor();
-      syncStateToPeer();
+      saveStateLocally(); renderTodos(); renderTodoEditor();
+      syncStateToOtherTabs();
+      showToast("할 일이 삭제되었습니다.");
     }
 
     function renderTodoEditor() {
@@ -1161,9 +1226,9 @@
         updated.push(document.getElementById(`tt-edit-${i}`).value || "-");
       }
       state.timetable[day] = updated;
-      saveState(); renderTimetable();
-      syncStateToPeer();
-      alert("8교시 시간표가 저장되었습니다!");
+      saveStateLocally(); renderTimetable();
+      syncStateToOtherTabs();
+      showToast(`${state.className} 시간표가 성공적으로 저장되었습니다! 📅`);
     }
 
     function renderMealEditor() {
@@ -1173,21 +1238,21 @@
     function saveMealEditor() {
       const val = document.getElementById('meal-editor-textarea').value;
       state.mealMenu = val.split('\n').map(s => s.trim()).filter(Boolean);
-      saveState(); renderMealMenu();
-      syncStateToPeer();
-      alert("급식 식단이 저장되었습니다.");
+      saveStateLocally(); renderMealMenu();
+      syncStateToOtherTabs();
+      showToast("급식 식단이 성공적으로 저장되었습니다! 🍽️");
     }
 
     function savePraiseSettings() {
       state.praiseTemp = parseInt(document.getElementById('praise-temp-input').value) || 0;
       state.praiseMsg = document.getElementById('praise-msg-input').value;
-      saveState(); renderPraise();
-      syncStateToPeer();
-      alert("온도계 설정이 저장되었습니다.");
+      saveStateLocally(); renderPraise();
+      syncStateToOtherTabs();
+      showToast("칭찬 온도계 설정이 저장되었습니다! 🌡️");
     }
 
-    function syncStateToPeer() {
-      sendP2PData({
+    function syncStateToOtherTabs() {
+      dispatchSyncData({
         type: 'STATE_UPDATE',
         payload: {
           className: state.className,
