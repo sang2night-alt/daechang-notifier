@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- PeerJS for background cross-device sync -->
+  <!-- PeerJS for WebRTC cross-device sync -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
   <style>
@@ -26,15 +26,6 @@
     .drag-handle { cursor: grab; }
     .drag-handle:active { cursor: grabbing; }
 
-    /* Responsive Grid Columns */
-    .col-span-1 { grid-column: span 1 / span 1; }
-    .col-span-2 { grid-column: span 2 / span 2; }
-    .col-span-3 { grid-column: span 3 / span 3; }
-
-    @media (max-width: 1024px) {
-      .col-span-2, .col-span-3 { grid-column: span 1 / span 1; }
-    }
-
     /* Custom Scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -50,12 +41,12 @@
       
       <!-- Brand & Classroom Picker -->
       <div class="flex items-center space-x-3">
-        <div class="p-2 bg-indigo-800 rounded-xl shadow-inner border border-indigo-600/50 flex items-center justify-center">
-          <i class="fa-solid fa-school text-xl text-yellow-300"></i>
+        <div class="p-2.5 bg-indigo-800 rounded-2xl shadow-inner border border-indigo-600/50 flex items-center justify-center">
+          <i class="fa-solid fa-school text-2xl text-yellow-300"></i>
         </div>
         <div>
           <div class="flex items-center space-x-2">
-            <h1 class="text-base sm:text-lg font-black tracking-tight text-white">대창중학교</h1>
+            <h1 class="text-base sm:text-xl font-black tracking-tight text-white">대창중학교</h1>
             <!-- Classroom Selector Button -->
             <button onclick="openClassSelectModal()" id="header-class-badge" class="bg-indigo-900/90 hover:bg-indigo-950 text-yellow-300 text-xs px-2.5 py-1 rounded-lg font-extrabold transition flex items-center border border-indigo-500/40 shadow-sm" title="클릭하여 교실/학급 변경">
               <i class="fa-solid fa-chalkboard-user mr-1.5 text-yellow-400"></i>
@@ -63,337 +54,354 @@
               <i class="fa-solid fa-chevron-down ml-1.5 text-[10px] text-indigo-300"></i>
             </button>
           </div>
-          <div class="flex items-center space-x-2 text-[11px] text-indigo-200 mt-0.5">
+          <div class="flex items-center space-x-2 text-xs text-indigo-200 mt-0.5">
             <span id="current-date-time">--월 --일 (요일) --:--</span>
             <span class="opacity-40">|</span>
-            <!-- Sync Indicator -->
-            <span id="sync-status-indicator" class="flex items-center text-[11px] text-emerald-300 font-medium" title="실시간 자동 동기화 활성화됨">
+            <!-- Sync Indicator & Test Button -->
+            <button onclick="testSyncConnection()" id="sync-status-indicator" class="flex items-center text-xs text-emerald-300 hover:text-white font-medium bg-indigo-800/80 hover:bg-indigo-900 px-2.5 py-0.5 rounded-lg border border-indigo-500/40 transition cursor-pointer" title="클릭하여 실시간 연동 신호 테스트">
               <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
               <span id="sync-channel-label">1-3반 동기화 중</span>
-            </span>
+              <i class="fa-solid fa-rotate ml-1.5 text-[10px] opacity-75"></i>
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- MAIN NAVIGATION TABS (Always visible) -->
-      <nav id="main-nav-tabs" class="flex flex-wrap items-center gap-1.5 bg-indigo-800/80 p-1.5 rounded-2xl border border-indigo-600/50 shadow-inner">
-        <button onclick="switchTab('notifier')" id="tab-btn-notifier" class="px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold bg-white text-indigo-700 shadow transition flex items-center">
-          <i class="fa-solid fa-bullhorn mr-1.5 text-indigo-600"></i> 스마트 알리미
+      <!-- Main Navigation Tabs -->
+      <nav class="flex items-center bg-indigo-800/80 p-1.5 rounded-2xl border border-indigo-600/60 shadow-inner space-x-1">
+        <button id="tab-btn-notifier" onclick="switchTab('notifier')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold bg-white text-indigo-700 shadow transition flex items-center">
+          <i class="fa-solid fa-bullhorn mr-1.5"></i> 스마트 알리미
         </button>
-        <button onclick="switchTab('meal')" id="tab-btn-meal" class="px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
-          <i class="fa-solid fa-utensils mr-1.5 text-amber-300"></i> 급식 식단
+        <button id="tab-btn-meal" onclick="switchTab('meal')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
+          <i class="fa-solid fa-utensils mr-1.5"></i> 급식 식단
         </button>
-        <button onclick="switchTab('mood')" id="tab-btn-mood" class="px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
-          <i class="fa-solid fa-face-smile mr-1.5 text-emerald-300"></i> 오늘의 기분
+        <button id="tab-btn-mood" onclick="switchTab('mood')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
+          <i class="fa-solid fa-face-smile mr-1.5"></i> 오늘의 기분
         </button>
-        <button onclick="switchTab('teacher')" id="tab-btn-teacher" class="px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold text-yellow-300 hover:bg-indigo-700/80 transition flex items-center">
-          <i id="teacher-tab-icon" class="fa-solid fa-lock mr-1.5"></i> <span id="teacher-tab-text">교사 대시보드</span>
+        <button id="tab-btn-teacher" onclick="switchTab('teacher')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-yellow-300 hover:bg-indigo-700/80 transition flex items-center">
+          <i id="teacher-tab-icon" class="fa-solid fa-lock mr-1.5"></i>
+          <span id="teacher-tab-text">교사 대시보드</span>
         </button>
       </nav>
 
     </div>
   </header>
 
-  <!-- MAIN CONTENT CONTAINER -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl w-full mx-auto p-4 sm:p-6 flex-1">
 
-    <!-- TAB 1: SMART NOTIFIER VIEW -->
+    <!-- VIEW 1: SMART NOTIFIER DASHBOARD -->
     <section id="view-notifier" class="space-y-6">
       
-      <!-- Dynamic Card Grid with Drag & Drop -->
-      <div id="card-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        
-        <!-- CARD 1: 오늘의 시간표 -->
-        <div id="card-timetable" draggable="true" class="col-span-1 grid-item bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" data-id="timetable">
+      <!-- Drag and Drop Grid Container -->
+      <div id="card-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- CARD 1: TIMETABLE -->
+        <div data-id="timetable" id="card-timetable" class="grid-item col-span-1 bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md flex flex-col justify-between">
           <div>
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-              <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center drag-handle" title="드래그하여 순서 이동">
-                <i class="fa-solid fa-grip-vertical text-slate-300 hover:text-slate-500 mr-2 transition"></i>
-                <i class="fa-solid fa-calendar-days text-indigo-600 mr-2"></i> 오늘의 시간표 (1~8교시)
-              </h2>
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
               <div class="flex items-center space-x-2">
-                <select onchange="changeCardSize('card-timetable', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded-lg px-2 py-1 font-semibold text-slate-600 outline-none hover:border-indigo-400 transition">
-                  <option value="col-span-1" selected>1칸 (기본)</option>
-                  <option value="col-span-2">2칸 (넓게)</option>
-                  <option value="col-span-3">3칸 (전체)</option>
-                </select>
+                <span class="drag-handle text-slate-300 hover:text-slate-500" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span>
+                <h3 class="font-extrabold text-base text-slate-800 flex items-center">
+                  <i class="fa-solid fa-calendar-days text-indigo-600 mr-2"></i> 오늘 시간표 (1~8교시)
+                </h3>
+              </div>
+              <div class="flex items-center space-x-1">
+                <button onclick="changeCardSize('card-timetable', 'col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">1열</button>
+                <button onclick="changeCardSize('card-timetable', 'col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">2열</button>
               </div>
             </div>
-            <div id="timetable-display" class="grid grid-cols-2 gap-2 text-sm">
-              <!-- Timetable populated via JS -->
+
+            <div id="timetable-display" class="grid grid-cols-2 gap-2">
+              <!-- Populated by JS -->
             </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 text-right">
+            <span class="text-[11px] text-slate-400 font-medium">* 교사 작성 시간표 실시간 연동</span>
           </div>
         </div>
 
-        <!-- CARD 2: 오늘 꼭 해야 할 일 -->
-        <div id="card-todo" draggable="true" class="col-span-1 grid-item bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" data-id="todo">
+        <!-- CARD 2: TODAY'S TO-DO LIST -->
+        <div data-id="todo" id="card-todo" class="grid-item col-span-1 bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md flex flex-col justify-between">
           <div>
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-              <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center drag-handle" title="드래그하여 순서 이동">
-                <i class="fa-solid fa-grip-vertical text-slate-300 hover:text-slate-500 mr-2 transition"></i>
-                <i class="fa-solid fa-list-check text-emerald-600 mr-2"></i> 오늘 꼭 해야 할 일
-              </h2>
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
               <div class="flex items-center space-x-2">
-                <select onchange="changeCardSize('card-todo', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded-lg px-2 py-1 font-semibold text-slate-600 outline-none hover:border-indigo-400 transition">
-                  <option value="col-span-1" selected>1칸 (기본)</option>
-                  <option value="col-span-2">2칸 (넓게)</option>
-                  <option value="col-span-3">3칸 (전체)</option>
-                </select>
+                <span class="drag-handle text-slate-300 hover:text-slate-500" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span>
+                <h3 class="font-extrabold text-base text-slate-800 flex items-center">
+                  <i class="fa-solid fa-list-check text-emerald-600 mr-2"></i> 오늘 꼭 해야 할 일
+                </h3>
+              </div>
+              <div class="flex items-center space-x-1">
+                <button onclick="changeCardSize('card-todo', 'col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 font-bold">1열</button>
+                <button onclick="changeCardSize('card-todo', 'col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 font-bold">2열</button>
               </div>
             </div>
-            <ul id="todo-list-display" class="space-y-2 text-sm text-slate-700 max-h-64 overflow-y-auto pr-1">
-              <!-- To-Do items populated via JS -->
+
+            <ul id="todo-list-display" class="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+              <!-- Populated by JS -->
             </ul>
           </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
+            <span>체크하여 완료 상태 업데이트</span>
+            <span class="text-emerald-600 font-bold" id="todo-count-badge">0개 진행 중</span>
+          </div>
         </div>
 
-        <!-- CARD 3: 학급 칭찬 온도계 -->
-        <div id="card-praise" draggable="true" class="col-span-1 grid-item bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between" data-id="praise">
+        <!-- CARD 3: PRAISE THERMOMETER -->
+        <div data-id="praise" id="card-praise" class="grid-item col-span-1 bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md flex flex-col justify-between">
           <div>
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-              <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center drag-handle" title="드래그하여 순서 이동">
-                <i class="fa-solid fa-grip-vertical text-slate-300 hover:text-slate-500 mr-2 transition"></i>
-                <i class="fa-solid fa-temperature-full text-rose-500 mr-2"></i> 우리반 칭찬 온도계
-              </h2>
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
               <div class="flex items-center space-x-2">
-                <select onchange="changeCardSize('card-praise', this.value)" class="size-select text-xs bg-slate-100 border border-slate-300 rounded-lg px-2 py-1 font-semibold text-slate-600 outline-none hover:border-indigo-400 transition">
-                  <option value="col-span-1" selected>1칸 (기본)</option>
-                  <option value="col-span-2">2칸 (넓게)</option>
-                  <option value="col-span-3">3칸 (전체)</option>
-                </select>
+                <span class="drag-handle text-slate-300 hover:text-slate-500" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span>
+                <h3 class="font-extrabold text-base text-slate-800 flex items-center">
+                  <i class="fa-solid fa-temperature-half text-rose-500 mr-2"></i> 우리반 칭찬 온도계
+                </h3>
+              </div>
+              <div class="flex items-center space-x-1">
+                <button onclick="changeCardSize('card-praise', 'col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 font-bold">1열</button>
+                <button onclick="changeCardSize('card-praise', 'col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 font-bold">2열</button>
               </div>
             </div>
-            
-            <div class="text-center py-3">
-              <div class="text-4xl font-black text-rose-500 mb-2 tracking-tight"><span id="praise-temp-display">75</span>°C</div>
-              <!-- Thermal Progress Bar -->
-              <div class="w-full bg-slate-200 rounded-full h-5 overflow-hidden p-0.5 shadow-inner mb-3">
-                <div id="praise-bar-display" class="bg-gradient-to-r from-amber-400 via-rose-400 to-rose-600 h-full rounded-full transition-all duration-700 shadow" style="width: 75%;"></div>
+
+            <div class="space-y-4 my-2">
+              <div class="flex items-baseline justify-between">
+                <span class="text-xs font-bold text-slate-500">현재 목표 달성도</span>
+                <span class="text-3xl font-black text-rose-600"><span id="praise-temp-display">75</span>°C</span>
               </div>
-              <p id="praise-msg-display" class="text-xs text-slate-600 font-bold bg-rose-50 border border-rose-100 py-1.5 px-3 rounded-xl inline-block">
-                목표 달성 시 학급 보상 지급!
-              </p>
+
+              <!-- Progress Bar -->
+              <div class="w-full bg-slate-100 rounded-full h-5 p-1 border border-slate-200 overflow-hidden shadow-inner">
+                <div id="praise-bar-display" class="bg-gradient-to-r from-amber-400 via-rose-500 to-pink-500 h-full rounded-full transition-all duration-700 shadow" style="width: 75%;"></div>
+              </div>
+
+              <div class="bg-rose-50 border border-rose-100 rounded-2xl p-3 text-center">
+                <p class="text-xs font-extrabold text-rose-800" id="praise-msg-display">목표 달성 시 학급 보상 지급!</p>
+              </div>
             </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 text-right">
+            <span class="text-[11px] text-slate-400 font-medium">선생님이 스티커를 부여하면 온도가 올라갑니다 🔥</span>
           </div>
         </div>
 
       </div>
     </section>
 
-    <!-- TAB 2: MEAL VIEW -->
+    <!-- VIEW 2: MEAL MENU VIEW -->
     <section id="view-meal" class="hidden space-y-6">
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto">
-        <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
-          <h2 class="text-xl font-extrabold text-slate-800 flex items-center">
-            <i class="fa-solid fa-utensils text-amber-500 mr-2.5"></i> 오늘의 급식 식단
+      <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-3xl p-6 shadow-md flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-black flex items-center">
+            <i class="fa-solid fa-utensils mr-3 text-amber-200"></i> 오늘의 맛있는 급식 식단
           </h2>
-          <span class="text-xs font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full" id="meal-date-display">--월 --일 급식</span>
+          <p class="text-xs sm:text-sm text-amber-100 mt-1">대창중학교 영양 선생님이 준비한 건강한 급식 메뉴입니다.</p>
         </div>
+        <span class="bg-white/20 backdrop-blur text-white text-xs px-3.5 py-1.5 rounded-full font-bold border border-white/30">
+          <i class="fa-solid fa-leaf mr-1"></i> 영양 가득 안전한 먹거리
+        </span>
+      </div>
 
-        <div class="bg-gradient-to-br from-amber-50 to-orange-50/40 border border-amber-200/80 rounded-2xl p-6 mb-6 shadow-inner">
-          <ul id="meal-menu-items" class="space-y-3 text-slate-800 font-bold text-base">
-            <!-- Meal items populated via JS -->
-          </ul>
-        </div>
-        
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-          <p class="text-xs text-slate-500 font-medium">
-            <i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i> 알레르기 안내: 1.밀, 2.대두, 3.우유, 5.돼지고기, 6.닭고기 등 학교 급식 표시 기준을 준수합니다.
-          </p>
-        </div>
+      <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
+        <h3 class="text-base font-extrabold text-slate-800 border-b border-slate-100 pb-3 flex items-center">
+          <i class="fa-solid fa-bowl-food text-amber-500 mr-2"></i> 금일 식단표
+        </h3>
+        <ul id="meal-menu-items" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm font-bold text-slate-700">
+          <!-- Populated by JS -->
+        </ul>
       </div>
     </section>
 
-    <!-- TAB 3: STUDENT MOOD VIEW -->
+    <!-- VIEW 3: TODAY'S MOOD CHECK-IN -->
     <section id="view-mood" class="hidden space-y-6">
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto">
-        <div class="text-center mb-6">
-          <h2 class="text-2xl font-black text-slate-800 mb-1">오늘 나의 기분은 어떤가요?</h2>
-          <p class="text-slate-500 text-xs font-semibold">
-            현재 교실: <span class="font-bold text-indigo-600" id="mood-view-class-label">1학년 3반</span> (담임 선생님만 확인할 수 있습니다)
-          </p>
-        </div>
+      <div class="bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-3xl p-6 shadow-md">
+        <h2 class="text-xl sm:text-2xl font-black flex items-center">
+          <i class="fa-solid fa-face-smile mr-3 text-teal-200"></i> 오늘의 내 마음 표현하기
+        </h2>
+        <p class="text-xs sm:text-sm text-teal-100 mt-1">
+          <span id="mood-board-class-name" class="font-bold underline">1학년 3반</span> 학급 마음 게시판입니다. 선택한 마음과 사유는 교사 대시보드로 실시간 전달됩니다.
+        </p>
+      </div>
 
-        <!-- Student Info Form -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+      <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-5 max-w-2xl mx-auto">
+        <div class="space-y-4">
           <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">학생 번호 / 이름 <span class="text-rose-500">*</span></label>
-            <input type="text" id="mood-student-info" placeholder="예: 12번 홍길동" class="w-full text-sm border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition">
+            <label class="block text-xs font-bold text-slate-600 mb-1.5">학번 및 이름</label>
+            <input type="text" id="mood-student-info" placeholder="예: 10301 홍길동" class="w-full border border-slate-300 rounded-xl p-3 text-sm font-semibold focus:ring-2 focus:ring-teal-500 outline-none">
           </div>
+
           <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">기분 선택 <span class="text-rose-500">*</span></label>
-            <select id="mood-emoji-select" class="w-full text-sm border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none font-bold transition bg-white">
-              <option value="😄">😄 최상 / 기쁨</option>
-              <option value="🙂" selected>🙂 보통 / 평온</option>
-              <option value="🥱">🥱 피곤 / 지침</option>
-              <option value="😢">😢 우울 / 걱정</option>
+            <label class="block text-xs font-bold text-slate-600 mb-1.5">오늘 내 기분 상태 선택</label>
+            <select id="mood-emoji-select" class="w-full border border-slate-300 rounded-xl p-3 text-base font-bold text-slate-800 focus:ring-2 focus:ring-teal-500 outline-none">
+              <option value="😄">😄 아주 기분 최고에요! (기쁨)</option>
+              <option value="😀">😀 평온하고 좋아요 (만족)</option>
+              <option value="😊">😊 설레고 기대돼요 (행복)</option>
+              <option value="😐">😐 그저 그래요 (보통)</option>
+              <option value="😟">😟 조금 걱정이나 고민이 있어요 (지침)</option>
+              <option value="😢">😢 마음이 슬프거나 속상해요 (우울)</option>
+              <option value="😡">😡 화나거나 짜증나요 (답답)</option>
+              <option value="😴">😴 피곤하고 졸려요 (피로)</option>
+              <option value="😷">😷 몸 상태가 안 좋아요 (아픔)</option>
             </select>
           </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1.5">이유 또는 선생님께 전달하고 싶은 말 (선택사항)</label>
+            <textarea id="mood-reason-text" rows="3" placeholder="선생님만 볼 수 있는 마음 메시지를 편하게 남겨주세요..." class="w-full border border-slate-300 rounded-xl p-3 text-sm font-medium focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
+          </div>
+
+          <button onclick="recordMoodWithReason()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-extrabold py-3.5 rounded-xl text-sm shadow-md transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>선생님께 내 마음 전송하기</span>
+          </button>
         </div>
 
-        <div class="mb-6">
-          <label class="block text-xs font-bold text-slate-600 mb-1">사유 또는 전하고 싶은 말</label>
-          <textarea id="mood-reason-text" rows="3" placeholder="오늘 기분이 그렇거나, 선생님께 이야기하고 싶은 내용을 자유롭게 작성해주세요." class="w-full text-sm border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition"></textarea>
-        </div>
-
-        <button onclick="recordMoodWithReason()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl transition shadow-md flex items-center justify-center text-sm">
-          <i class="fa-solid fa-paper-plane mr-2"></i> 선생님께 마음 전달하기
-        </button>
-
-        <div id="mood-feedback" class="hidden mt-4 p-3 bg-emerald-100 text-emerald-800 rounded-xl text-sm font-bold text-center border border-emerald-200">
-          <i class="fa-solid fa-circle-check mr-1.5"></i> 기분이 성공적으로 등록되어 교무실로 전달되었습니다!
+        <div id="mood-feedback" class="hidden p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-bold text-center border border-emerald-200">
+          ✨ 마음이 선생님 대시보드로 실시간 전달되었습니다!
         </div>
       </div>
     </section>
 
-    <!-- TAB 4: TEACHER DASHBOARD VIEW -->
+    <!-- VIEW 4: TEACHER DASHBOARD -->
     <section id="view-teacher" class="hidden space-y-6">
-      <div class="bg-slate-800 text-white p-5 rounded-2xl shadow-md flex flex-wrap justify-between items-center gap-3">
+      
+      <!-- Dashboard Top Banner -->
+      <div class="bg-slate-800 text-white p-5 rounded-3xl shadow-md flex flex-wrap justify-between items-center gap-3">
         <div>
           <div class="flex items-center space-x-2">
             <h2 class="text-lg sm:text-xl font-bold flex items-center">
-              <i class="fa-solid fa-user-shield text-amber-400 mr-2"></i> 교사 전용 대시보드
+              <i class="fa-solid fa-user-shield text-amber-400 mr-2"></i> 교사 전용 관리 대시보드
             </h2>
             <span class="bg-amber-400 text-slate-900 font-extrabold text-xs px-2.5 py-0.5 rounded-full" id="teacher-current-class-badge">1학년 3반 관리 중</span>
           </div>
-          <p class="text-xs text-slate-300 mt-1">실시간 원격 호출, 시간표, 급식, 할 일 및 학생 기분 현황을 실시간 관리합니다.</p>
+          <p class="text-xs text-slate-300 mt-1">원격 학생 호출, 시간표, 급식, 할 일 및 학생 마음 전달 상태를 실시간 통합 제어합니다.</p>
         </div>
         
         <div class="flex items-center space-x-2">
+          <button onclick="testSyncConnection()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-2 rounded-xl transition font-bold flex items-center">
+            <i class="fa-solid fa-rotate mr-1.5"></i> 연동 테스트
+          </button>
           <button onclick="openClassSelectModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2 rounded-xl transition font-bold flex items-center">
             <i class="fa-solid fa-arrows-rotate mr-1.5"></i> 교실 전환
           </button>
           <button onclick="lockTeacherMode()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-xl transition font-semibold">
-            <i class="fa-solid fa-lock mr-1"></i> 교사 세션 종료
+            <i class="fa-solid fa-lock mr-1"></i> 세션 종료
           </button>
         </div>
       </div>
 
-      <!-- REAL-TIME MOOD MONITOR BOARD -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-        <div class="flex justify-between items-center pb-2 border-b border-slate-100">
-          <h3 class="text-base font-bold text-slate-800 flex items-center">
-            <i class="fa-solid fa-heart-pulse text-rose-500 mr-2"></i> 실시간 학생 기분 현황판 (<span id="mood-board-class-name">1학년 3반</span>)
-          </h3>
-          <button onclick="clearMoodLogs()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-bold transition">
-            기록 초기화
-          </button>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-50 text-slate-500 text-xs border-b border-slate-200">
-              <tr>
-                <th class="p-2.5">접수 시각</th>
-                <th class="p-2.5">학생 번호/이름</th>
-                <th class="p-2.5">기분</th>
-                <th class="p-2.5">사유 및 전하고 싶은 말</th>
-              </tr>
-            </thead>
-            <tbody id="teacher-mood-log-table" class="divide-y divide-slate-100">
-              <!-- Populated via JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- CLASS INFO & PRAISE CONFIG -->
+      <!-- TEACHER CONTROLS GRID -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- School Class Config -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-          <h3 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
-            <i class="fa-solid fa-school-flag text-indigo-600 mr-2"></i> 학급 정보 설정
+
+        <!-- STUDENT CALL CONTROLLER -->
+        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
+          <h3 class="text-base font-extrabold text-slate-800 pb-2 border-b border-slate-100 flex items-center justify-between">
+            <span class="flex items-center"><i class="fa-solid fa-bullhorn text-indigo-600 mr-2"></i> 원격 학생 호출 방송</span>
+            <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg" id="call-target-class-name">1학년 3반</span>
           </h3>
-          <div class="grid grid-cols-2 gap-4">
+
+          <div class="space-y-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">학교 이름</label>
-              <input type="text" id="school-name-input" value="대창중학교" disabled class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 text-sm text-slate-500 font-medium">
+              <label class="block text-xs font-bold text-slate-600 mb-1">호출 대상 학생</label>
+              <input type="text" id="call-target" placeholder="예: 전체 학생 또는 특정 번호/이름" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
+
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">현재 학급 명칭</label>
-              <input type="text" id="school-class-input" value="1학년 3반" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+              <label class="block text-xs font-bold text-slate-600 mb-1">호출 사유 / 전달 메시지</label>
+              <input type="text" id="call-reason" placeholder="예: 10초 후 주시하세요! / 교무실 방문 바람" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
+
+            <!-- Quick Preset Reasons -->
+            <div class="flex flex-wrap gap-1.5">
+              <button onclick="setReason('10초 후 화면을 주시하세요!')" class="text-xs bg-slate-100 hover:bg-indigo-100 text-slate-700 font-bold px-2.5 py-1 rounded-lg">👀 10초 주시</button>
+              <button onclick="setReason('교과서 42쪽을 펼치세요.')" class="text-xs bg-slate-100 hover:bg-indigo-100 text-slate-700 font-bold px-2.5 py-1 rounded-lg">📖 교과서 확인</button>
+              <button onclick="setReason('자리를 정돈하고 조용히 하세요.')" class="text-xs bg-slate-100 hover:bg-indigo-100 text-slate-700 font-bold px-2.5 py-1 rounded-lg">🤫 정숙 요청</button>
+              <button onclick="setReason('교무실로 오세요.')" class="text-xs bg-slate-100 hover:bg-indigo-100 text-slate-700 font-bold px-2.5 py-1 rounded-lg">🏢 교무실 호출</button>
+            </div>
+
+            <button onclick="sendStudentCall(false)" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 rounded-xl text-sm transition shadow">
+              📢 선택 대상 원격 호출 발송
+            </button>
           </div>
-          <button onclick="saveClassInfo()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
-            학급 정보 저장
-          </button>
+
+          <!-- Emergency Alert Box -->
+          <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-red-700 uppercase flex items-center">
+                <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-600"></i> 긴급 학급 사이렌 방송
+              </span>
+              <span class="text-[10px] bg-red-200 text-red-900 px-2 py-0.5 rounded-md font-bold" id="emergency-target-class-label">1학년 3반</span>
+            </div>
+            <input type="text" id="emergency-reason" placeholder="긴급 메시지 (예: 즉시 전원 이동 및 주목!)" class="w-full border border-red-300 rounded-xl p-2 text-xs font-bold text-red-900 focus:ring-2 focus:ring-red-500 outline-none">
+            <button onclick="sendStudentCall(true)" class="w-full bg-red-600 hover:bg-red-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-bell"></i>
+              <span>🔴 학급 전체 긴급 경보 발송</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Praise Temp Config -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-          <h3 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
-            <i class="fa-solid fa-sliders text-indigo-600 mr-2"></i> 학급 온도계 제어
-          </h3>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">현재 온도 (°C)</label>
-              <input type="number" id="praise-temp-input" value="75" min="0" max="100" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-bold">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">목표 보상 메시지</label>
-              <input type="text" id="praise-msg-input" value="목표 달성 시 학급 보상 지급!" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-medium">
-            </div>
-          </div>
-          <button onclick="savePraiseSettings()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
-            온도계 설정 저장
-          </button>
-        </div>
-      </div>
+        <!-- PRAISE THERMOMETER EDITOR & MOOD LOGS -->
+        <div class="space-y-6">
 
-      <!-- CALL CONTROL CENTER -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-        <h3 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
-          <i class="fa-solid fa-bell text-indigo-600 mr-2"></i> 학생 원격 호출 및 긴급 경보 제어 (<span id="call-target-class-name">1학년 3반</span>)
-        </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Normal Call -->
-          <div class="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 space-y-3">
-            <h4 class="font-bold text-indigo-900 text-sm flex items-center">
-              <i class="fa-solid fa-bullhorn text-indigo-600 mr-2"></i> 일반 학생 호출
-            </h4>
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">호출 대상 (학생 번호 또는 이름)</label>
-              <input type="text" id="call-target" placeholder="예: 5번 / 김철수 / 전체" class="w-full text-sm border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">호출 사유 입력</label>
-              <input type="text" id="call-reason" placeholder="예: 제출물 확인, 교무탁으로 오기" class="w-full text-sm border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none mb-2 bg-white">
-              
-              <div class="flex flex-wrap gap-1.5">
-                <button onclick="setReason('🏃 교무탁 오기')" class="text-xs bg-white border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg hover:bg-indigo-100 font-semibold transition">🏃 교무탁 오기</button>
-                <button onclick="setReason('📁 제출물 확인')" class="text-xs bg-white border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg hover:bg-indigo-100 font-semibold transition">📁 제출물 확인</button>
-                <button onclick="setReason('✏️ 준비물 확인')" class="text-xs bg-white border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg hover:bg-indigo-100 font-semibold transition">✏️ 준비물 확인</button>
-                <button onclick="setReason('💬 잠시 상담')" class="text-xs bg-white border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg hover:bg-indigo-100 font-semibold transition">💬 잠시 상담</button>
+          <!-- Praise Thermometer Manager -->
+          <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
+            <h3 class="text-base font-extrabold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
+              <i class="fa-solid fa-temperature-half text-rose-500 mr-2"></i> 칭찬 온도계 설정
+            </h3>
+            <div class="space-y-3 text-sm">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">현재 온도 (°C)</label>
+                <input type="number" id="praise-temp-input" min="0" max="100" class="w-full border border-slate-300 rounded-xl p-2.5 font-extrabold text-rose-600 outline-none">
               </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">달성 목표 메시지</label>
+                <input type="text" id="praise-msg-input" class="w-full border border-slate-300 rounded-xl p-2.5 font-bold outline-none">
+              </div>
+              <button onclick="savePraiseSettings()" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-extrabold py-2.5 rounded-xl text-sm transition">
+                🔥 칭찬 온도 저장
+              </button>
             </div>
-            <button onclick="sendStudentCall(false)" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-sm transition shadow-sm">
-              <i class="fa-solid fa-paper-plane mr-1.5"></i> 일반 호출 발송
-            </button>
           </div>
 
-          <!-- Emergency Call -->
-          <div class="bg-rose-50/80 border border-rose-200 rounded-2xl p-4 space-y-3 flex flex-col justify-between">
-            <div>
-              <h4 class="font-bold text-rose-900 text-sm flex items-center mb-1.5">
-                <i class="fa-solid fa-triangle-exclamation text-rose-600 mr-2"></i> 긴급 경보 호출
-              </h4>
-              <p class="text-xs text-rose-700 mb-3">현재 교실(<span class="font-bold" id="emergency-target-class-label">1학년 3반</span>) 태블릿에 점멸 화면과 긴급 사이렌을 발송합니다.</p>
-              <input type="text" id="emergency-reason" placeholder="긴급 알림 메시지" class="w-full text-sm border border-rose-300 rounded-xl p-2.5 focus:ring-2 focus:ring-rose-500 outline-none mb-3 bg-white">
+          <!-- Real-Time Mood Log Table -->
+          <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-3">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 class="text-base font-extrabold text-slate-800 flex items-center">
+                <i class="fa-solid fa-comments text-teal-600 mr-2"></i> 실시간 학생 마음 수신함
+              </h3>
+              <button onclick="clearMoodLogs()" class="text-xs text-rose-500 hover:text-rose-700 font-bold">기록 초기화</button>
             </div>
-            <button onclick="sendStudentCall(true)" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3 rounded-xl text-sm transition shadow-sm animate-pulse">
-              <i class="fa-solid fa-bell text-yellow-300 mr-1.5"></i> 🚨 긴급 경보 발송
-            </button>
+
+            <div class="max-h-48 overflow-y-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="bg-slate-100 text-slate-600">
+                    <th class="p-2 rounded-l-lg">시간</th>
+                    <th class="p-2">학생</th>
+                    <th class="p-2">기분</th>
+                    <th class="p-2 rounded-r-lg">전달 내용</th>
+                  </tr>
+                </thead>
+                <tbody id="teacher-mood-log-table" class="divide-y divide-slate-100">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
           </div>
+
         </div>
+
       </div>
 
-      <!-- EDITORS: TIMETABLE (1~8교시), MEAL, TO-DO -->
+      <!-- EDITORS: TIMETABLE, MEAL, TO-DO -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Timetable Editor -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+
+        <!-- Timetable Editor (1~8 Period) -->
+        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
           <div class="flex justify-between items-center pb-2 border-b border-slate-100">
-            <h3 class="text-base font-bold text-slate-800 flex items-center">
+            <h3 class="text-base font-extrabold text-slate-800 flex items-center">
               <i class="fa-solid fa-pen-to-square text-indigo-600 mr-2"></i> 시간표 관리 (1~8교시)
             </h3>
             <select id="timetable-day-select" onchange="loadDayTimetableEditor()" class="text-xs bg-slate-100 border border-slate-300 rounded-xl px-2.5 py-1.5 font-bold outline-none">
@@ -406,24 +414,25 @@
           </div>
 
           <div id="timetable-editor-inputs" class="grid grid-cols-2 gap-3 text-sm">
-            <!-- Populated via JS -->
+            <!-- Populated by JS -->
           </div>
 
-          <button onclick="saveTimetableEditor()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
-            💾 선택 요일 시간표 저장 (1~8교시)
+          <button onclick="saveTimetableEditor()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-sm transition">
+            💾 선택 요일 시간표 저장
           </button>
         </div>
 
         <!-- Meal & Todo Editor -->
         <div class="space-y-6">
+
           <!-- Meal Editor -->
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-            <h3 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
+          <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-3">
+            <h3 class="text-base font-extrabold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
               <i class="fa-solid fa-utensils text-amber-500 mr-2"></i> 급식 식단 관리
             </h3>
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">오늘의 메뉴 (줄바꿈 구분)</label>
-              <textarea id="meal-editor-textarea" rows="3" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-amber-500 outline-none"></textarea>
+              <label class="block text-xs font-bold text-slate-600 mb-1">오늘의 메뉴 (줄바꿈 구분)</label>
+              <textarea id="meal-editor-textarea" rows="3" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-amber-500"></textarea>
             </div>
             <button onclick="saveMealEditor()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold py-2.5 rounded-xl text-sm transition">
               🍽️ 급식 식단 저장
@@ -431,29 +440,32 @@
           </div>
 
           <!-- To-Do Editor -->
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-            <h3 class="text-base font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
+          <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-3">
+            <h3 class="text-base font-extrabold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
               <i class="fa-solid fa-tasks text-emerald-600 mr-2"></i> 오늘 꼭 해야 할 일 관리
             </h3>
 
             <div class="flex space-x-2">
-              <input type="text" id="new-todo-input" placeholder="새로운 할 일 입력..." class="flex-1 border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-              <button onclick="addTodoItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition">
+              <input type="text" id="new-todo-input" placeholder="새로운 할 일 입력..." class="flex-1 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+              <button onclick="addTodoItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-sm transition">
                 ➕ 추가
               </button>
             </div>
 
             <ul id="todo-editor-list" class="space-y-2 text-sm max-h-40 overflow-y-auto pr-1">
-              <!-- Populated via JS -->
+              <!-- Populated by JS -->
             </ul>
           </div>
+
         </div>
+
       </div>
+
     </section>
 
   </main>
 
-  <!-- CLASSROOM SELECTION MODAL -->
+  <!-- MODAL 1: CLASSROOM SELECTION MODAL -->
   <div id="class-select-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
     <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 border border-indigo-100">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -465,48 +477,42 @@
         </button>
       </div>
 
-      <p class="text-xs text-slate-500">
-        접속하고자 하는 학년과 반을 선택하세요. 각 교실마다 고유 시간표, 할 일, 칭찬 온도계 및 실시간 알림 채널이 독립 연결됩니다.
+      <p class="text-xs text-slate-500 font-medium">
+        접속하고자 하는 학년과 반을 선택하세요. 각 학급마다 고유 시간표, 할 일, 칭찬 온도계 및 실시간 알림 채널이 독립 연결됩니다.
       </p>
 
-      <!-- Quick Grade Selector Tabs -->
+      <!-- Grade Selector Buttons -->
       <div class="space-y-3">
         <div>
-          <span class="text-xs font-bold text-indigo-600 uppercase">1학년</span>
+          <span class="text-xs font-extrabold text-indigo-600 uppercase">1학년</span>
           <div class="grid grid-cols-5 gap-2 mt-1" id="class-buttons-grade-1">
             <!-- Populated via JS -->
           </div>
         </div>
 
         <div>
-          <span class="text-xs font-bold text-indigo-600 uppercase">2학년</span>
+          <span class="text-xs font-extrabold text-indigo-600 uppercase">2학년</span>
           <div class="grid grid-cols-5 gap-2 mt-1" id="class-buttons-grade-2">
             <!-- Populated via JS -->
           </div>
         </div>
 
         <div>
-          <span class="text-xs font-bold text-indigo-600 uppercase">3학년</span>
+          <span class="text-xs font-extrabold text-indigo-600 uppercase">3학년</span>
           <div class="grid grid-cols-5 gap-2 mt-1" id="class-buttons-grade-3">
             <!-- Populated via JS -->
           </div>
         </div>
       </div>
 
-      <!-- Custom Class Name Input -->
-      <div class="pt-3 border-t border-slate-100">
-        <label class="block text-xs font-bold text-slate-600 mb-1">직접 학급명 입력 (예: 특별실 / 음악실)</label>
-        <div class="flex space-x-2">
-          <input type="text" id="custom-class-input" placeholder="예: 1학년 6반, 음악실" class="flex-1 text-sm border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-indigo-500">
-          <button onclick="applyCustomClassroom()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 rounded-xl text-sm transition">
-            선택 완료
-          </button>
-        </div>
+      <div class="pt-2 border-t border-slate-100 flex justify-between items-center">
+        <input type="text" id="custom-class-input" placeholder="직접 입력 (예: 음악실)" class="border border-slate-300 rounded-xl p-2 text-xs font-semibold w-2/3 outline-none">
+        <button onclick="applyCustomClass()" class="bg-indigo-600 text-white font-bold text-xs px-4 py-2 rounded-xl hover:bg-indigo-700">적용</button>
       </div>
     </div>
   </div>
 
-  <!-- CALL ALERT MODAL -->
+  <!-- MODAL 2: CALL ALERT MODAL -->
   <div id="call-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
     <div id="call-modal-card" class="bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl transform transition-all border-4 border-indigo-500">
       <div id="call-modal-badge" class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-extrabold bg-indigo-100 text-indigo-700 mb-4">
@@ -517,24 +523,26 @@
         <p class="text-xs font-bold text-slate-400 mb-1">호출 사유</p>
         <p id="call-modal-reason" class="text-xl font-bold text-slate-800">-</p>
       </div>
-      <button onclick="stopAudioAndCloseModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-lg py-3 rounded-xl transition shadow-lg mt-2">
+      <button onclick="stopAudioAndCloseModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-lg py-3.5 rounded-xl transition shadow-lg mt-2">
         확인하였습니다
       </button>
     </div>
   </div>
 
-  <!-- PIN MODAL -->
+  <!-- MODAL 3: TEACHER PIN AUTHORIZATION -->
   <div id="pin-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl p-6 max-w-xs w-full text-center shadow-xl border border-slate-100">
-      <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl font-bold">
+    <div class="bg-white rounded-3xl p-6 max-w-xs w-full text-center shadow-xl border border-slate-100 space-y-4">
+      <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
         <i class="fa-solid fa-key"></i>
       </div>
-      <h3 class="text-lg font-bold text-slate-800 mb-1">교사 인증</h3>
-      <p class="text-xs text-slate-500 mb-4">비밀번호를 입력하세요 (기본: 1234)</p>
-      <input type="password" id="pin-input" maxlength="4" placeholder="PIN" class="w-full text-center text-2xl font-bold border-2 border-slate-300 rounded-xl p-2 mb-4 tracking-widest focus:border-amber-500 outline-none">
+      <div>
+        <h3 class="text-lg font-bold text-slate-800">교사 인증</h3>
+        <p class="text-xs text-slate-500 mt-1">비밀번호를 입력하세요 (기본: 1234)</p>
+      </div>
+      <input type="password" id="pin-input" maxlength="4" placeholder="PIN" class="w-full text-center text-2xl font-bold border-2 border-slate-300 rounded-xl p-2 tracking-widest focus:border-amber-500 outline-none">
       <div class="flex space-x-2">
         <button onclick="closePinModal()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm">취소</button>
-        <button onclick="verifyPin()" class="flex-1 bg-amber-500 text-slate-900 font-bold py-2.5 rounded-xl text-sm hover:bg-amber-600">확인</button>
+        <button onclick="verifyPin()" class="flex-1 bg-amber-500 text-slate-900 font-extrabold py-2.5 rounded-xl text-sm hover:bg-amber-600">확인</button>
       </div>
     </div>
   </div>
@@ -546,20 +554,20 @@
   </div>
 
   <script>
-    // Global Application State Management
+    // GLOBAL STATE MANAGEMENT
     const state = {
       isTeacherAuthenticated: false,
       pin: "1234",
       currentTab: "notifier",
       idleTimer: null,
       schoolName: "대창중학교",
-      className: "1학년 3반", // Default active classroom
+      className: "1학년 3반",
       praiseTemp: 75,
       praiseMsg: "목표 달성 시 학급 보상 지급!",
       mealMenu: ["현미밥", "쇠고기미역국", "언양식불고기", "배추김치", "친환경 사과"],
       todos: [
         { id: 1, text: "수학 익힘책 42~45쪽 제출", done: false },
-        { id: 2, text: "과학 탐구 보고서 구글 클래스룸 제출", done: false }
+        { id: 2, text: "과학 탐구 보고서 제출", done: false }
       ],
       timetable: {
         mon: ["국어", "수학", "영어", "사회", "과학", "체육", "자율", "동아리"],
@@ -568,7 +576,6 @@
         thu: ["과학", "국어", "수학", "체육", "영어", "역사", "미술", "음악"],
         fri: ["사회", "수학", "국어", "음악", "기술가정", "학급회의", "동아리", "창체"]
       },
-      cardOrder: ["timetable", "todo", "praise"],
       cardSizes: {
         timetable: "col-span-1",
         todo: "col-span-1",
@@ -577,17 +584,44 @@
       moodLogs: []
     };
 
-    // Multi-Layer Communication Engine (Storage Event + BroadcastChannel + PeerJS P2P)
+    // MULTI-LAYER COMMUNICATION ENGINE (BroadcastChannel + LocalStorage Event + PeerJS)
     let broadcastChannel = null;
     let peer = null;
     let peerConnections = [];
+    let lastProcessedPacketId = null;
+    let audioContext = null;
+    let currentOscillator = null;
 
     function getClassKey(name = state.className) {
       return name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
     }
 
+    // Save State Locally
+    function saveStateLocally(shouldBroadcast = true) {
+      try {
+        const classKey = getClassKey();
+        localStorage.setItem(`daechang_state_${classKey}`, JSON.stringify(state));
+      } catch(e) {}
+      
+      if (shouldBroadcast) {
+        syncStateToOtherTabs();
+      }
+    }
+
+    // Load State Locally
+    function loadStateLocally() {
+      try {
+        const classKey = getClassKey();
+        const saved = localStorage.getItem(`daechang_state_${classKey}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          Object.assign(state, parsed);
+        }
+      } catch(e) {}
+    }
+
+    // Initialize Auto-Sync System
     function initAutoSyncSystem() {
-      // 1. Clean previous channels
       if (broadcastChannel) {
         try { broadcastChannel.close(); } catch(e) {}
       }
@@ -600,10 +634,9 @@
       const classKey = getClassKey();
       const channelName = `daechang_sync_${classKey}`;
       
-      // Update UI channel badge
-      document.getElementById('sync-channel-label').innerText = `${state.className} 실시간 연동 중`;
+      document.getElementById('sync-channel-label').innerText = `${state.className} 동기화 중`;
 
-      // LAYER 1: Native LocalStorage Event Listener (100% Reliability for Cross-Tab Sync on same device)
+      // LAYER 1: Native Storage Event (Cross-Tab / Cross-Window)
       window.removeEventListener('storage', handleStorageEvent);
       window.addEventListener('storage', handleStorageEvent);
 
@@ -613,7 +646,7 @@
         broadcastChannel.onmessage = (event) => handleIncomingSyncPacket(event.data);
       }
 
-      // LAYER 3: PeerJS for Cross-Device WebRTC Network Data Sync
+      // LAYER 3: PeerJS P2P WebRTC Network
       try {
         const hostPeerId = `daechang-class-${classKey}-host`;
         peer = new Peer(hostPeerId, {
@@ -660,29 +693,40 @@
 
     function handleIncomingSyncPacket(packet) {
       if (!packet) return;
+      if (packet._id && packet._id === lastProcessedPacketId) return;
+      if (packet._id) lastProcessedPacketId = packet._id;
+
       if (packet.type === 'CALL_SIGNAL') {
         showCallModal(packet.target, packet.reason, packet.isEmergency);
       } else if (packet.type === 'STATE_UPDATE') {
         if (packet.payload) {
           Object.assign(state, packet.payload);
-          saveStateLocally(false); // local write without re-dispatch loop
+          saveStateLocally(false);
           renderAll();
         }
       } else if (packet.type === 'MOOD_SUBMIT') {
         if (packet.payload) {
-          state.moodLogs.unshift(packet.payload);
-          saveStateLocally(false);
-          renderMoodLogTable();
+          const exists = state.moodLogs.some(l => l.time === packet.payload.time && l.student === packet.payload.student && l.reason === packet.payload.reason);
+          if (!exists) {
+            state.moodLogs.unshift(packet.payload);
+            saveStateLocally(false);
+            renderMoodLogTable();
+            showToast(`💌 [${state.className}] 새로운 마음 메시지가 도착했습니다!`);
+          }
         }
+      } else if (packet.type === 'SYNC_TEST') {
+        showToast(`⚡ [${packet.sender || '연동 기기'}] 실시간 동기화 신호 수신 완료!`);
       }
     }
 
     function dispatchSyncData(packet) {
       const classKey = getClassKey();
-      const payloadWithTs = { ...packet, _ts: Date.now() };
+      const payloadWithTs = { ...packet, _ts: Date.now(), _id: Math.random().toString(36).substring(2, 11) };
 
       // 1. Storage Event Dispatch
-      localStorage.setItem(`daechang_packet_${classKey}`, JSON.stringify(payloadWithTs));
+      try {
+        localStorage.setItem(`daechang_packet_${classKey}`, JSON.stringify(payloadWithTs));
+      } catch(e) {}
 
       // 2. BroadcastChannel Dispatch
       if (broadcastChannel) {
@@ -691,262 +735,83 @@
 
       // 3. PeerJS Data Channel Dispatch
       peerConnections.forEach(conn => {
-        if (conn && conn.open) conn.send(payloadWithTs);
+        if (conn && conn.open) {
+          try { conn.send(payloadWithTs); } catch(e) {}
+        }
       });
     }
 
-    // Audio Alert Synthesizer
-    let audioCtx = null;
-    let audioLoopInterval = null;
-
-    function playLoopingSound(isEmergency = false) {
-      stopLoopingSound();
-      try {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-
-        const triggerBeep = () => {
-          if (isEmergency) {
-            [0, 0.15, 0.3].forEach(delay => {
-              const osc = audioCtx.createOscillator();
-              const gain = audioCtx.createGain();
-              osc.type = 'sawtooth';
-              osc.frequency.value = 880; 
-              gain.gain.setValueAtTime(0.35, audioCtx.currentTime + delay);
-              gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + 0.12);
-              osc.connect(gain);
-              gain.connect(audioCtx.destination);
-              osc.start(audioCtx.currentTime + delay);
-              osc.stop(audioCtx.currentTime + delay + 0.12);
-            });
-          } else {
-            [0, 0.14].forEach((delay, idx) => {
-              const osc = audioCtx.createOscillator();
-              const gain = audioCtx.createGain();
-              osc.type = 'sine';
-              osc.frequency.value = idx === 0 ? 523.25 : 659.25;
-              gain.gain.setValueAtTime(0.3, audioCtx.currentTime + delay);
-              gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + 0.12);
-              osc.connect(gain);
-              gain.connect(audioCtx.destination);
-              osc.start(audioCtx.currentTime + delay);
-              osc.stop(audioCtx.currentTime + delay + 0.12);
-            });
-          }
-        };
-
-        triggerBeep();
-        audioLoopInterval = setInterval(triggerBeep, isEmergency ? 800 : 1200);
-      } catch (e) {
-        console.log("Audio play error", e);
-      }
+    function testSyncConnection() {
+      dispatchSyncData({
+        type: 'SYNC_TEST',
+        sender: state.className
+      });
+      showToast(`⚡ [${state.className}] 연동 테스트 신호를 발송했습니다!`);
     }
 
-    function stopLoopingSound() {
-      if (audioLoopInterval) {
-        clearInterval(audioLoopInterval);
-        audioLoopInterval = null;
-      }
+    function syncStateToOtherTabs() {
+      dispatchSyncData({
+        type: 'STATE_UPDATE',
+        payload: {
+          className: state.className,
+          praiseTemp: state.praiseTemp,
+          praiseMsg: state.praiseMsg,
+          mealMenu: state.mealMenu,
+          todos: state.todos,
+          timetable: state.timetable,
+          moodLogs: state.moodLogs,
+          cardSizes: state.cardSizes
+        }
+      });
+    }
+
+    // AUDIO SYNTHESIZER FOR CALLS & EMERGENCY SIREN
+    function playAudioChime(isEmergency = false) {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+
+        if (currentOscillator) {
+          try { currentOscillator.stop(); } catch(e) {}
+        }
+
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        if (isEmergency) {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(880, audioContext.currentTime);
+          osc.frequency.linearRampToValueAtTime(440, audioContext.currentTime + 0.3);
+          osc.frequency.linearRampToValueAtTime(880, audioContext.currentTime + 0.6);
+          gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        } else {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+          osc.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.15); // E5
+          osc.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.3); // G5
+          gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.8);
+        }
+
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.start();
+        if (!isEmergency) {
+          osc.stop(audioContext.currentTime + 0.8);
+        }
+        currentOscillator = osc;
+      } catch(e) {}
     }
 
     function stopAudioAndCloseModal() {
-      stopLoopingSound();
+      if (currentOscillator) {
+        try { currentOscillator.stop(); } catch(e) {}
+      }
       closeCallModal();
-    }
-
-    window.onload = function() {
-      updateDateTime();
-      setInterval(updateDateTime, 1000);
-      
-      const lastClass = localStorage.getItem('daechang_active_classroom') || "1학년 3반";
-      selectClassroom(lastClass, false);
-
-      applyCardSettings();
-      setupDragAndDrop();
-      setupIdleTimer();
-      renderClassSelectModalGrid();
-    };
-
-    function updateDateTime() {
-      const now = new Date();
-      const days = ['일', '월', '화', '수', '목', '금', '토'];
-      const str = `${now.getMonth()+1}월 ${now.getDate()}일 (${days[now.getDay()]}) ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      document.getElementById('current-date-time').innerText = str;
-      document.getElementById('meal-date-display').innerText = `${now.getMonth()+1}월 ${now.getDate()}일 급식 식단`;
-    }
-
-    function saveStateLocally(shouldDispatch = true) {
-      const storageKey = `daechang_notifier_state_${getClassKey()}`;
-      localStorage.setItem(storageKey, JSON.stringify({
-        className: state.className,
-        praiseTemp: state.praiseTemp,
-        praiseMsg: state.praiseMsg,
-        mealMenu: state.mealMenu,
-        todos: state.todos,
-        timetable: state.timetable,
-        cardOrder: state.cardOrder,
-        cardSizes: state.cardSizes,
-        moodLogs: state.moodLogs
-      }));
-      localStorage.setItem('daechang_active_classroom', state.className);
-
-      if (shouldDispatch) {
-        syncStateToOtherTabs();
-      }
-    }
-
-    function loadState() {
-      const storageKey = `daechang_notifier_state_${getClassKey()}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        state.className = parsed.className ?? state.className;
-        state.praiseTemp = parsed.praiseTemp ?? 75;
-        state.praiseMsg = parsed.praiseMsg ?? "목표 달성 시 학급 보상 지급!";
-        state.mealMenu = parsed.mealMenu ?? ["현미밥", "쇠고기미역국", "언양식불고기", "배추김치", "친환경 사과"];
-        state.todos = parsed.todos ?? [
-          { id: 1, text: "수학 익힘책 42~45쪽 제출", done: false },
-          { id: 2, text: "과학 탐구 보고서 제출", done: false }
-        ];
-        state.timetable = parsed.timetable ?? {
-          mon: ["국어", "수학", "영어", "사회", "과학", "체육", "자율", "동아리"],
-          tue: ["수학", "국어", "음악", "미술", "미술", "동아리", "창체", "진로"],
-          wed: ["영어", "수학", "국어", "도덕", "사회", "자율", "과학", "체육"],
-          thu: ["과학", "국어", "수학", "체육", "영어", "역사", "미술", "음악"],
-          fri: ["사회", "수학", "국어", "음악", "기술가정", "학급회의", "동아리", "창체"]
-        };
-        state.cardOrder = parsed.cardOrder ?? ["timetable", "todo", "praise"];
-        state.cardSizes = parsed.cardSizes ?? { timetable: "col-span-1", todo: "col-span-1", praise: "col-span-1" };
-        state.moodLogs = parsed.moodLogs ?? [];
-      } else {
-        state.praiseTemp = 75;
-        state.praiseMsg = "목표 달성 시 학급 보상 지급!";
-        state.moodLogs = [];
-      }
-    }
-
-    // Classroom Selector Modals & Buttons
-    function openClassSelectModal() {
-      document.getElementById('class-select-modal').classList.remove('hidden');
-    }
-
-    function closeClassSelectModal() {
-      document.getElementById('class-select-modal').classList.add('hidden');
-    }
-
-    function selectClassroom(className, shouldSync = true) {
-      state.className = className;
-      loadState();
-      initAutoSyncSystem();
-      renderAll();
-      closeClassSelectModal();
-
-      if (shouldSync) {
-        saveStateLocally(true);
-      }
-    }
-
-    function applyCustomClassroom() {
-      const val = document.getElementById('custom-class-input').value.trim();
-      if (!val) {
-        showToast("학급 명칭을 입력하세요.", true);
-        return;
-      }
-      selectClassroom(val);
-      document.getElementById('custom-class-input').value = '';
-    }
-
-    function renderClassSelectModalGrid() {
-      [1, 2, 3].forEach(grade => {
-        const container = document.getElementById(`class-buttons-grade-${grade}`);
-        if (!container) return;
-        let html = '';
-        for (let room = 1; room <= 5; room++) {
-          const name = `${grade}학년 ${room}반`;
-          html += `
-            <button onclick="selectClassroom('${name}')" class="py-2 text-xs font-bold rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-600 hover:text-white transition shadow-sm">
-              ${room}반
-            </button>
-          `;
-        }
-        container.innerHTML = html;
-      });
-    }
-
-    function applyCardSettings() {
-      const grid = document.getElementById('card-grid');
-      state.cardOrder.forEach(id => {
-        const card = document.getElementById(`card-${id}`);
-        if(card) grid.appendChild(card);
-      });
-      Object.keys(state.cardSizes).forEach(id => {
-        const card = document.getElementById(`card-${id}`);
-        if(card) {
-          card.classList.remove('col-span-1', 'col-span-2', 'col-span-3');
-          card.classList.add(state.cardSizes[id]);
-          const select = card.querySelector('.size-select');
-          if(select) select.value = state.cardSizes[id];
-        }
-      });
-    }
-
-    function changeCardSize(cardDomId, colClass) {
-      const card = document.getElementById(cardDomId);
-      card.classList.remove('col-span-1', 'col-span-2', 'col-span-3');
-      card.classList.add(colClass);
-      
-      const dataId = card.getAttribute('data-id');
-      state.cardSizes[dataId] = colClass;
-      saveStateLocally(false);
-    }
-
-    // Drag and Drop Grid Mechanics
-    function setupDragAndDrop() {
-      const grid = document.getElementById('card-grid');
-      const cards = grid.querySelectorAll('.grid-item');
-
-      cards.forEach(card => {
-        card.addEventListener('dragstart', () => card.classList.add('dragging'));
-        card.addEventListener('dragend', () => {
-          card.classList.remove('dragging');
-          saveCardOrder();
-        });
-      });
-
-      grid.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const afterElement = getDragAfterElement(grid, e.clientY);
-        const draggable = document.querySelector('.dragging');
-        if (afterElement == null) {
-          grid.appendChild(draggable);
-        } else {
-          grid.insertBefore(draggable, afterElement);
-        }
-      });
-    }
-
-    function getDragAfterElement(container, y) {
-      const draggableElements = [...container.querySelectorAll('.grid-item:not(.dragging)')];
-      return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        } else {
-          return closest;
-        }
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-
-    function saveCardOrder() {
-      const grid = document.getElementById('card-grid');
-      const currentOrder = [...grid.querySelectorAll('.grid-item')].map(card => card.getAttribute('data-id'));
-      state.cardOrder = currentOrder;
-      saveStateLocally(false);
     }
 
     // TAB NAVIGATION SWITCHER
@@ -961,34 +826,33 @@
       state.currentTab = tab;
       
       // Hide all views
-      document.getElementById('view-notifier').classList.add('hidden');
-      document.getElementById('view-meal').classList.add('hidden');
-      document.getElementById('view-mood').classList.add('hidden');
-      document.getElementById('view-teacher').classList.add('hidden');
-
-      // Reset all tab button styles
       ['notifier', 'meal', 'mood', 'teacher'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        if (view) view.classList.add('hidden');
+
         const btn = document.getElementById(`tab-btn-${t}`);
         if (!btn) return;
+
         if (t === 'teacher') {
-          btn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold text-yellow-300 hover:bg-indigo-700/80 transition flex items-center";
+          btn.className = "px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-yellow-300 hover:bg-indigo-700/80 transition flex items-center";
         } else {
-          btn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center";
+          btn.className = "px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center";
         }
       });
 
-      // Highlight active tab
+      // Show requested view & active button style
+      const activeView = document.getElementById(`view-${tab}`);
+      if (activeView) activeView.classList.remove('hidden');
+
       const activeBtn = document.getElementById(`tab-btn-${tab}`);
       if (activeBtn) {
         if (tab === 'teacher') {
-          activeBtn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold bg-amber-400 text-slate-900 shadow transition flex items-center";
+          activeBtn.className = "px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold bg-amber-400 text-slate-900 shadow transition flex items-center";
         } else {
-          activeBtn.className = "px-3 py-1.5 text-xs sm:text-sm rounded-xl font-bold bg-white text-indigo-700 shadow transition flex items-center";
+          activeBtn.className = "px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold bg-white text-indigo-700 shadow transition flex items-center";
         }
       }
 
-      // Show requested view
-      document.getElementById(`view-${tab}`).classList.remove('hidden');
       resetIdleTimer();
     }
 
@@ -997,7 +861,7 @@
       document.getElementById('teacher-tab-icon').className = "fa-solid fa-lock mr-1.5";
       document.getElementById('teacher-tab-text').innerText = "교사 대시보드";
       switchTab('notifier');
-      showToast("교사 세션이 정상적으로 종료되었습니다.");
+      showToast("교사 세션이 정식 종료되었습니다.");
     }
 
     function closePinModal() {
@@ -1046,7 +910,7 @@
       if (isEmergency) {
         modalCard.className = "rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl transform transition-all text-white animate-emergency border-4 border-red-300";
         modalBadge.className = "inline-flex items-center px-4 py-1.5 rounded-full text-sm font-extrabold bg-red-900 text-yellow-300 mb-4 shadow";
-        modalBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i> ⚠️ 긴급 경보 호출`;
+        modalBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i> ⚠️ 긴급 경보 방송`;
       } else {
         modalCard.className = "bg-white rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl transform transition-all border-4 border-indigo-500 text-slate-800";
         modalBadge.className = "inline-flex items-center px-4 py-1.5 rounded-full text-sm font-extrabold bg-indigo-100 text-indigo-700 mb-4";
@@ -1054,7 +918,7 @@
       }
 
       document.getElementById('call-modal').classList.remove('hidden');
-      playLoopingSound(isEmergency);
+      playAudioChime(isEmergency);
     }
 
     function closeCallModal() {
@@ -1067,7 +931,7 @@
       const reason = document.getElementById('mood-reason-text').value.trim();
 
       if (!info) {
-        showToast("학생 번호와 이름을 입력하세요.", true);
+        showToast("학번과 이름을 입력하세요.", true);
         return;
       }
 
@@ -1077,15 +941,21 @@
       
       state.moodLogs.unshift(logEntry);
       saveStateLocally(true);
+
+      dispatchSyncData({
+        type: 'MOOD_SUBMIT',
+        payload: logEntry
+      });
+
       renderMoodLogTable();
 
       document.getElementById('mood-reason-text').value = '';
       const feedback = document.getElementById('mood-feedback');
       if (feedback) {
         feedback.classList.remove('hidden');
-        setTimeout(() => feedback.classList.add('hidden'), 3000);
+        setTimeout(() => feedback.classList.add('hidden'), 3500);
       }
-      showToast("마음이 성공적으로 전달되었습니다! 💌");
+      showToast("선생님께 마음이 성공적으로 전달되었습니다! 💌");
     }
 
     function showToast(message, isError = false) {
@@ -1106,7 +976,7 @@
       clearTimeout(window.toastTimer);
       window.toastTimer = setTimeout(() => {
         toast.className = "fixed bottom-5 right-5 z-50 flex items-center space-x-2.5 bg-emerald-600 text-white font-bold px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none";
-      }, 2500);
+      }, 2800);
     }
 
     function clearMoodLogs() {
@@ -1116,12 +986,11 @@
       showToast("학급 기분 기록이 초기화되었습니다.");
     }
 
+    // RENDER ALL VIEWS
     function renderAll() {
       document.getElementById('current-class-label').innerText = state.className;
-      document.getElementById('school-class-input').value = state.className;
-      document.getElementById('mood-view-class-label').innerText = state.className;
-      document.getElementById('teacher-current-class-badge').innerText = `${state.className} 관리 중`;
       document.getElementById('mood-board-class-name').innerText = state.className;
+      document.getElementById('teacher-current-class-badge').innerText = `${state.className} 관리 중`;
       document.getElementById('call-target-class-name').innerText = state.className;
       document.getElementById('emergency-target-class-label').innerText = state.className;
 
@@ -1153,8 +1022,8 @@
     function renderMealMenu() {
       const container = document.getElementById('meal-menu-items');
       container.innerHTML = state.mealMenu.map(item => `
-        <li class="flex items-center space-x-3 bg-white p-3 rounded-xl border border-amber-100 shadow-sm">
-          <span class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-black">🍽️</span>
+        <li class="flex items-center space-x-3 bg-slate-50 p-3.5 rounded-xl border border-amber-100 shadow-sm">
+          <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm font-black">🍽️</span>
           <span>${item}</span>
         </li>
       `).join('');
@@ -1162,6 +1031,9 @@
 
     function renderTodos() {
       const container = document.getElementById('todo-list-display');
+      const activeCount = state.todos.filter(t => !t.done).length;
+      document.getElementById('todo-count-badge').innerText = `${activeCount}개 남음`;
+
       if (state.todos.length === 0) {
         container.innerHTML = `<li class="text-slate-400 text-xs text-center py-6">등록된 할 일이 없습니다.</li>`;
         return;
@@ -1170,7 +1042,7 @@
         <li class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 shadow-sm">
           <label class="flex items-center space-x-2.5 cursor-pointer w-full">
             <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})" class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer">
-            <span class="${t.done ? 'line-through text-slate-400' : 'font-semibold text-slate-700'}">${t.text}</span>
+            <span class="${t.done ? 'line-through text-slate-400' : 'font-semibold text-slate-700'} text-xs sm:text-sm">${t.text}</span>
           </label>
         </li>
       `).join('');
@@ -1178,7 +1050,7 @@
 
     function renderPraise() {
       document.getElementById('praise-temp-display').innerText = state.praiseTemp;
-      document.getElementById('praise-bar-display').style.width = `${state.praiseTemp}%`;
+      document.getElementById('praise-bar-display').style.width = `${Math.min(100, Math.max(0, state.praiseTemp))}%`;
       document.getElementById('praise-msg-display').innerText = state.praiseMsg;
       document.getElementById('praise-temp-input').value = state.praiseTemp;
       document.getElementById('praise-msg-input').value = state.praiseMsg;
@@ -1193,25 +1065,115 @@
       }
       container.innerHTML = state.moodLogs.map(log => `
         <tr class="hover:bg-slate-50 transition">
-          <td class="p-2.5 text-xs text-slate-400">${log.time}</td>
-          <td class="p-2.5 font-bold text-slate-800">${log.student}</td>
-          <td class="p-2.5 text-xl">${log.emoji}</td>
-          <td class="p-2.5 text-slate-600 text-xs">${log.reason}</td>
+          <td class="p-2 text-xs text-slate-400">${log.time}</td>
+          <td class="p-2 font-bold text-slate-800">${log.student}</td>
+          <td class="p-2 text-xl">${log.emoji}</td>
+          <td class="p-2 text-slate-600 text-xs">${log.reason}</td>
         </tr>
       `).join('');
     }
 
-    // Teacher Management Handlers
-    function saveClassInfo() {
-      const newName = document.getElementById('school-class-input').value.trim();
-      if (!newName) return;
-      state.className = newName;
+    // Card Resizer Handler
+    function changeCardSize(cardDomId, colClass) {
+      const card = document.getElementById(cardDomId);
+      if (!card) return;
+      card.classList.remove('col-span-1', 'col-span-2', 'col-span-3');
+      card.classList.add(colClass);
+      
+      const dataId = card.getAttribute('data-id');
+      state.cardSizes[dataId] = colClass;
       saveStateLocally(true);
-      initAutoSyncSystem();
-      renderAll();
-      showToast("학급 정보가 변경되었습니다.");
     }
 
+    // Drag and Drop Card Grid
+    function setupDragAndDrop() {
+      const grid = document.getElementById('card-grid');
+      if (!grid) return;
+      const cards = grid.querySelectorAll('.grid-item');
+
+      cards.forEach(card => {
+        const handle = card.querySelector('.drag-handle');
+        if (handle) {
+          handle.addEventListener('mousedown', () => card.setAttribute('draggable', 'true'));
+          handle.addEventListener('mouseup', () => card.removeAttribute('draggable'));
+        }
+        card.addEventListener('dragstart', () => card.classList.add('dragging'));
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          card.removeAttribute('draggable');
+        });
+      });
+
+      grid.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(grid, e.clientY);
+        const draggable = document.querySelector('.dragging');
+        if (!draggable) return;
+        if (afterElement == null) {
+          grid.appendChild(draggable);
+        } else {
+          grid.insertBefore(draggable, afterElement);
+        }
+      });
+    }
+
+    function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll('.grid-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // CLASSROOM SELECTION MODAL HANDLERS
+    function openClassSelectModal() {
+      populateClassModalButtons();
+      document.getElementById('class-select-modal').classList.remove('hidden');
+    }
+
+    function closeClassSelectModal() {
+      document.getElementById('class-select-modal').classList.add('hidden');
+    }
+
+    function populateClassModalButtons() {
+      for (let g = 1; g <= 3; g++) {
+        const container = document.getElementById(`class-buttons-grade-${g}`);
+        if (!container) continue;
+        container.innerHTML = [1, 2, 3, 4, 5].map(c => {
+          const targetName = `${g}학년 ${c}반`;
+          const isSelected = state.className === targetName;
+          return `
+            <button onclick="selectClassroom('${targetName}')" class="p-2 text-xs font-extrabold rounded-xl transition ${isSelected ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 hover:bg-indigo-100 text-slate-700'}">
+              ${g}-${c}반
+            </button>
+          `;
+        }).join('');
+      }
+    }
+
+    function selectClassroom(className) {
+      state.className = className;
+      saveStateLocally(false);
+      loadStateLocally();
+      initAutoSyncSystem();
+      renderAll();
+      closeClassSelectModal();
+      showToast(`[${className}] 교실로 전환되었습니다. 🏫`);
+    }
+
+    function applyCustomClass() {
+      const input = document.getElementById('custom-class-input').value.trim();
+      if (input) {
+        selectClassroom(input);
+      }
+    }
+
+    // TEACHER EDITORS logic
     function addTodoItem() {
       const input = document.getElementById('new-todo-input');
       const text = input.value.trim();
@@ -1219,7 +1181,7 @@
       state.todos.push({ id: Date.now(), text: text, done: false });
       input.value = '';
       saveStateLocally(true); renderTodos(); renderTodoEditor();
-      showToast("할 일이 추가되었습니다. 📝");
+      showToast("새 할 일이 추가되었습니다. 📝");
     }
 
     function toggleTodo(id) {
@@ -1251,7 +1213,7 @@
       container.innerHTML = subjects.map((subj, idx) => `
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-0.5">${idx + 1}교시</label>
-          <input type="text" id="tt-edit-${idx}" value="${subj}" class="w-full border border-slate-300 rounded-lg p-2 text-sm font-semibold">
+          <input type="text" id="tt-edit-${idx}" value="${subj}" class="w-full border border-slate-300 rounded-lg p-2 text-xs font-semibold">
         </div>
       `).join('');
     }
@@ -1285,18 +1247,17 @@
       showToast("칭찬 온도계 설정이 저장되었습니다! 🌡️");
     }
 
-    function syncStateToOtherTabs() {
-      dispatchSyncData({
-        type: 'STATE_UPDATE',
-        payload: {
-          className: state.className,
-          praiseTemp: state.praiseTemp,
-          praiseMsg: state.praiseMsg,
-          mealMenu: state.mealMenu,
-          todos: state.todos,
-          timetable: state.timetable
-        }
-      });
+    // CLOCK & IDLE TIMERS
+    function updateClock() {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const date = now.getDate();
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const day = dayNames[now.getDay()];
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+
+      document.getElementById('current-date-time').innerText = `${month}월 ${date}일 (${day}) ${hours}:${minutes}`;
     }
 
     function resetIdleTimer() {
@@ -1305,7 +1266,7 @@
         if (state.currentTab !== 'notifier' && !state.isTeacherAuthenticated) {
           switchTab('notifier');
         }
-      }, 60000);
+      }, 120000); // Auto return to notifier after 2 mins idle
     }
 
     function setupIdleTimer() {
@@ -1313,6 +1274,17 @@
         window.addEventListener(evt, resetIdleTimer)
       );
     }
+
+    // APP INITIALIZATION ON WINDOW LOAD
+    window.onload = function() {
+      loadStateLocally();
+      initAutoSyncSystem();
+      renderAll();
+      setupDragAndDrop();
+      setupIdleTimer();
+      updateClock();
+      setInterval(updateClock, 10000);
+    };
   </script>
 </body>
 </html>
