@@ -78,6 +78,10 @@
         <button id="tab-btn-mood" onclick="switchTab('mood')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
           <i class="fa-solid fa-face-smile mr-1.5"></i> 오늘의 기분
         </button>
+        <!-- 추가된 15초 스피드 광클레이스 탭 -->
+        <button id="tab-btn-clickrace" onclick="switchTab('clickrace')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
+          <i class="fa-solid fa-bolt mr-1.5 text-yellow-300"></i> 광클 레이스
+        </button>
         <button id="tab-btn-teacher" onclick="switchTab('teacher')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-yellow-300 hover:bg-indigo-700/80 transition flex items-center">
           <i id="teacher-tab-icon" class="fa-solid fa-lock mr-1.5"></i>
           <span id="teacher-tab-text">교사 대시보드</span>
@@ -271,6 +275,96 @@
         <div id="mood-feedback" class="hidden p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-bold text-center border border-emerald-200">
           ✨ 마음이 선생님 대시보드로 실시간 전달되었습니다!
         </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3.5: 15초 스피드 광클레이스 VIEW -->
+    <section id="view-clickrace" class="hidden space-y-6">
+      <div class="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white rounded-3xl p-6 shadow-md flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-black flex items-center">
+            <i class="fa-solid fa-bolt mr-3 text-yellow-300 animate-bounce"></i> 15초 스피드 광클 레이스
+          </h2>
+          <p class="text-xs sm:text-sm text-amber-100 mt-1">
+            15초 동안 누구보다 빠르게 버튼을 광클하세요! 최고 기록을 달성하여 전학급 명예의 전당에 도전하세요.
+          </p>
+        </div>
+        <span class="bg-white/20 backdrop-blur text-white text-xs px-3.5 py-1.5 rounded-full font-bold border border-white/30 flex items-center">
+          <i class="fa-solid fa-trophy mr-1.5 text-yellow-300"></i> 전학급 실시간 명예의 전당
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Column: Game Area -->
+        <div class="lg:col-span-5 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between space-y-5">
+          <div>
+            <h3 class="text-base font-extrabold text-slate-800 border-b border-slate-100 pb-3 flex items-center justify-between">
+              <span class="flex items-center"><i class="fa-solid fa-gamepad text-amber-500 mr-2"></i> 레이스 준비</span>
+              <span id="clickrace-status-badge" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-bold">준비 대기</span>
+            </h3>
+
+            <!-- Student Name Input -->
+            <div class="mt-4 space-y-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">학번 및 이름 (선수 등록)</label>
+                <input type="text" id="clickrace-student-name" placeholder="예: 10305 김광클" class="w-full border border-slate-300 rounded-xl p-3 text-sm font-semibold focus:ring-2 focus:ring-amber-500 outline-none">
+              </div>
+            </div>
+
+            <!-- Timer and Score Dashboard -->
+            <div class="grid grid-cols-2 gap-3 mt-4">
+              <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+                <span class="block text-xs font-extrabold text-amber-700 mb-1">남은 시간</span>
+                <span id="clickrace-timer" class="text-3xl font-black text-amber-600">15.0</span> <span class="text-xs font-bold text-amber-600">초</span>
+              </div>
+              <div class="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-center">
+                <span class="block text-xs font-extrabold text-rose-700 mb-1">현재 클릭 수</span>
+                <span id="clickrace-counter" class="text-3xl font-black text-rose-600">0</span> <span class="text-xs font-bold text-rose-600">회</span>
+              </div>
+            </div>
+
+            <!-- Click Race Button -->
+            <div class="mt-6 flex flex-col items-center justify-center">
+              <button id="clickrace-btn" onclick="handleClickRaceBtn()" class="w-full h-44 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 hover:from-amber-500 hover:to-rose-600 text-white rounded-3xl font-black text-2xl shadow-xl transform active:scale-95 transition-all flex flex-col items-center justify-center space-y-2 border-4 border-amber-200/50 cursor-pointer select-none">
+                <i id="clickrace-btn-icon" class="fa-solid fa-hand-pointer text-4xl animate-pulse"></i>
+                <span id="clickrace-btn-text">게임 시작하기</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="text-center text-xs text-slate-400 font-medium pt-2 border-t border-slate-100">
+            ⚡ 연타 속도가 빠를수록 높은 순위를 기록할 수 있습니다!
+          </div>
+        </div>
+
+        <!-- Right Column: Shared Leaderboard -->
+        <div class="lg:col-span-7 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 class="text-base font-extrabold text-slate-800 flex items-center">
+              <i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> 전학급 실시간 광클 명예의 전당 TOP 10
+            </h3>
+            <span class="text-[11px] bg-yellow-100 text-yellow-800 font-extrabold px-2.5 py-1 rounded-lg">전교 공통 랭킹</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm">
+              <thead>
+                <tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                  <th class="p-3 rounded-l-xl text-center w-14">순위</th>
+                  <th class="p-3">학급</th>
+                  <th class="p-3">이름</th>
+                  <th class="p-3 text-right">최고 기록</th>
+                  <th class="p-3 rounded-r-xl text-center">날짜</th>
+                </tr>
+              </thead>
+              <tbody id="clickrace-leaderboard-body" class="divide-y divide-slate-100 font-bold text-slate-700">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -495,7 +589,7 @@
       </div>
 
       <p class="text-xs text-slate-500 font-medium">
-        접속하고자 하는 학년과 반을 선택하세요. 각 학급마다 고유 시간표, 할 일, 칭찬 온도계 및 실시간 알림 채널이 독립 연결됩니다. (급식 식단은 공통 유지)
+        접속하고자 하는 학년과 반을 선택하세요. 각 학급마다 고유 시간표, 할 일, 칭찬 온도계 및 실시간 알림 채널이 독립 연결됩니다. (급식 및 광클 명예의 전당은 공통 유지)
       </p>
 
       <!-- Grade Selector Buttons -->
@@ -599,11 +693,25 @@
         todo: "col-span-1",
         praise: "col-span-1"
       },
-      moodLogs: []
+      moodLogs: [],
+      // 전학급 실시간 광클 명예의 전당 기본 기록
+      clickRaceScores: [
+        { className: "1학년 3반", name: "홍길동", clicks: 135, date: "09-23" },
+        { className: "2학년 1반", name: "김빛나", clicks: 122, date: "09-23" },
+        { className: "3학년 2반", name: "이철수", clicks: 110, date: "09-23" }
+      ]
     };
 
     // GLOBAL APPLICATION STATE
     let state = JSON.parse(JSON.stringify(defaultState));
+
+    // 광클 레이스 변수
+    let raceState = {
+      isActive: false,
+      timeLeft: 15.0,
+      clicks: 0,
+      timerInterval: null
+    };
 
     // REALTIME MQTT CLIENT OVER WEBSOCKET
     let mqttClient = null;
@@ -644,18 +752,20 @@
       return merged;
     }
 
-    // Save State Locally (학급별 독립 저장 + 급식 전 학급 공통 저장)
+    // Save State Locally (학급별 독립 저장 + 급식 및 광클 전 학급 공통 저장)
     function saveStateLocally(shouldBroadcast = true) {
       try {
         const classKey = getClassKey();
         
-        // 1. 학급별 독립 데이터 저장 (급식 식단 제외)
+        // 1. 학급별 독립 데이터 저장 (급식, 광클 랭킹 제외)
         const classSpecificState = { ...state };
         delete classSpecificState.mealMenu;
+        delete classSpecificState.clickRaceScores;
         localStorage.setItem(`daechang_state_${classKey}`, JSON.stringify(classSpecificState));
 
-        // 2. 급식 식단은 모든 학급 공통 저장
+        // 2. 급식 및 광클 랭킹은 모든 학급 공통 저장
         localStorage.setItem('daechang_shared_meal', JSON.stringify(state.mealMenu));
+        localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
       } catch(e) {}
       
       if (shouldBroadcast) {
@@ -663,7 +773,7 @@
       }
     }
 
-    // Load State Locally (학급 개별 데이터 불러오기 + 공통 급식 합성)
+    // Load State Locally (학급 개별 데이터 불러오기 + 공통 데이터 합성)
     function loadStateLocally() {
       try {
         const classKey = getClassKey();
@@ -685,6 +795,14 @@
         } else {
           state.mealMenu = [...defaultState.mealMenu];
         }
+
+        // 전 학급 공통 광클 명예의 전당 불러오기
+        const sharedClickRaceRaw = localStorage.getItem('daechang_shared_clickrace');
+        if (sharedClickRaceRaw) {
+          state.clickRaceScores = JSON.parse(sharedClickRaceRaw);
+        } else {
+          state.clickRaceScores = [...defaultState.clickRaceScores];
+        }
       } catch(e) {
         state = mergeStateWithDefaults(null);
       }
@@ -695,9 +813,11 @@
       if (confirm(`현재 학급 [${state.className}]의 시간표 및 설정 데이터를 초기 상태로 복구하시겠습니까?`)) {
         const currentClass = state.className;
         const sharedMeal = [...state.mealMenu]; // 공통 급식 데이터 유지
+        const sharedScores = [...state.clickRaceScores]; // 공통 랭킹 데이터 유지
         state = JSON.parse(JSON.stringify(defaultState));
         state.className = currentClass;
         state.mealMenu = sharedMeal;
+        state.clickRaceScores = sharedScores;
         saveStateLocally(true);
         renderAll();
         showToast("현재 학급 데이터가 초기화 복구되었습니다! 🔄");
@@ -709,6 +829,7 @@
       const classKey = getClassKey();
       const topicClass = `daechang_middle_school/class_${classKey}`;
       const topicCommonMeal = `daechang_middle_school/common_meal`;
+      const topicCommonClickRace = `daechang_middle_school/common_clickrace`;
       
       const indicatorLabel = document.getElementById('sync-channel-label');
       const indicatorDot = document.getElementById('sync-status-dot');
@@ -736,10 +857,10 @@
           if (indicatorLabel) indicatorLabel.innerText = `${state.className} 실시간 연동 완료`;
           if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse";
 
-          // 학급 개별 채널 + 공통 급식 채널 동시 구독
-          mqttClient.subscribe([topicClass, topicCommonMeal], { qos: 1 }, (err) => {
+          // 학급 개별 채널 + 공통 급식 채널 + 공통 광클 레이스 채널 동시 구독
+          mqttClient.subscribe([topicClass, topicCommonMeal, topicCommonClickRace], { qos: 1 }, (err) => {
             if (!err) {
-              console.log(`Subscribed to class & meal channels: ${topicClass}, ${topicCommonMeal}`);
+              console.log(`Subscribed channels: ${topicClass}, ${topicCommonMeal}, ${topicCommonClickRace}`);
             }
           });
         });
@@ -779,8 +900,10 @@
       } else if (packet.type === 'STATE_UPDATE') {
         if (packet.payload) {
           const currentMeal = state.mealMenu;
+          const currentScores = state.clickRaceScores;
           state = mergeStateWithDefaults(packet.payload);
           state.mealMenu = currentMeal; // 공통 급식 보존
+          state.clickRaceScores = currentScores; // 공통 랭킹 보존
           saveStateLocally(false);
           renderAll();
         }
@@ -791,6 +914,13 @@
           renderMealMenu();
           renderMealEditor();
           showToast("🍱 공통 급식 식단이 실시간 업데이트되었습니다!");
+        }
+      } else if (packet.type === 'COMMON_CLICKRACE_UPDATE') {
+        if (packet.payload && Array.isArray(packet.payload)) {
+          state.clickRaceScores = packet.payload;
+          localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
+          renderClickRaceLeaderboard();
+          showToast("🏆 광클 명예의 전당 랭킹이 실시간 갱신되었습니다!");
         }
       } else if (packet.type === 'MOOD_SUBMIT') {
         if (packet.payload) {
@@ -807,9 +937,13 @@
       }
     }
 
-    function dispatchSyncData(packet, isCommonMeal = false) {
+    function dispatchSyncData(packet, isCommonTopic = false, topicName = '') {
       const classKey = getClassKey();
-      const topic = isCommonMeal ? `daechang_middle_school/common_meal` : `daechang_middle_school/class_${classKey}`;
+      let topic = `daechang_middle_school/class_${classKey}`;
+      if (isCommonTopic) {
+        topic = topicName || `daechang_middle_school/common_meal`;
+      }
+
       const payloadWithMeta = { 
         ...packet, 
         senderId: clientId,
@@ -845,7 +979,7 @@
       });
     }
 
-    // AUDIO SYNTHESIZER FOR CALLS & EMERGENCY SIREN
+    // AUDIO SYNTHESIZER FOR CALLS & EMERGENCY SIREN & CLICK SOUNDS
     function initAudioContextOnGesture() {
       if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -891,6 +1025,22 @@
       } catch(e) {}
     }
 
+    function playSubtleClickSound() {
+      try {
+        initAudioContextOnGesture();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500 + Math.min(raceState.clicks * 4, 800), audioContext.currentTime);
+        gain.gain.setValueAtTime(0.05, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.04);
+      } catch(e){}
+    }
+
     function stopAudioAndCloseModal() {
       if (currentOscillator) {
         try { currentOscillator.stop(); } catch(e) {}
@@ -913,7 +1063,7 @@
       state.currentTab = tab;
       
       // Hide all views
-      ['notifier', 'meal', 'mood', 'teacher'].forEach(t => {
+      ['notifier', 'meal', 'mood', 'clickrace', 'teacher'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (view) view.classList.add('hidden');
 
@@ -1045,6 +1195,134 @@
       showToast("선생님께 마음이 성공적으로 전달되었습니다! 💌");
     }
 
+    // 15초 스피드 광클레이스 게임 로직
+    function handleClickRaceBtn() {
+      initAudioContextOnGesture();
+
+      if (!raceState.isActive && raceState.timeLeft === 15.0) {
+        // 이름 입력 체크
+        const nameInput = document.getElementById('clickrace-student-name').value.trim();
+        if (!nameInput) {
+          showToast("게임 시작 전 학번과 이름을 입력해주세요!", true);
+          return;
+        }
+
+        // 게임 카운트다운 시작
+        raceState.isActive = true;
+        raceState.clicks = 0;
+        raceState.timeLeft = 15.0;
+
+        document.getElementById('clickrace-status-badge').className = "text-xs bg-rose-100 text-rose-700 px-2.5 py-1 rounded-lg font-bold animate-pulse";
+        document.getElementById('clickrace-status-badge').innerText = "🔥 광클 진행 중!";
+
+        document.getElementById('clickrace-btn-text').innerText = "광클하세요!!!";
+        document.getElementById('clickrace-btn-icon').className = "fa-solid fa-fire text-5xl animate-bounce";
+
+        raceState.timerInterval = setInterval(() => {
+          raceState.timeLeft = Math.max(0, parseFloat((raceState.timeLeft - 0.1).toFixed(1)));
+          document.getElementById('clickrace-timer').innerText = raceState.timeLeft.toFixed(1);
+
+          if (raceState.timeLeft <= 0) {
+            endClickRace();
+          }
+        }, 100);
+
+      } else if (raceState.isActive) {
+        // 광클 카운트 증가
+        raceState.clicks++;
+        document.getElementById('clickrace-counter').innerText = raceState.clicks;
+        playSubtleClickSound();
+      }
+    }
+
+    function endClickRace() {
+      clearInterval(raceState.timerInterval);
+      raceState.isActive = false;
+
+      const finalClicks = raceState.clicks;
+      const nameInput = document.getElementById('clickrace-student-name').value.trim() || "익명";
+
+      document.getElementById('clickrace-status-badge').className = "text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg font-bold";
+      document.getElementById('clickrace-status-badge').innerText = "게임 종료!";
+
+      document.getElementById('clickrace-btn-text').innerText = "다시 도전하기";
+      document.getElementById('clickrace-btn-icon').className = "fa-solid fa-rotate-right text-4xl";
+
+      setTimeout(() => {
+        raceState.timeLeft = 15.0;
+        document.getElementById('clickrace-timer').innerText = "15.0";
+        document.getElementById('clickrace-status-badge').className = "text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-bold";
+        document.getElementById('clickrace-status-badge').innerText = "준비 대기";
+      }, 2500);
+
+      // 새로운 최고 기록 반영
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const date = String(now.getDate()).padStart(2, '0');
+      const dateStr = `${month}-${date}`;
+
+      const newEntry = {
+        className: state.className,
+        name: nameInput,
+        clicks: finalClicks,
+        date: dateStr
+      };
+
+      state.clickRaceScores.push(newEntry);
+      // 내림차순 정렬
+      state.clickRaceScores.sort((a, b) => b.clicks - a.clicks);
+      // 상위 20개 유지
+      state.clickRaceScores = state.clickRaceScores.slice(0, 20);
+
+      // 공통 저장 및 MQTT 실시간 전파
+      localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
+      dispatchSyncData({
+        type: 'COMMON_CLICKRACE_UPDATE',
+        payload: state.clickRaceScores
+      }, true, `daechang_middle_school/common_clickrace`);
+
+      renderClickRaceLeaderboard();
+      showToast(`🎉 15초 동안 ${finalClicks}회 광클! 명예의 전당에 등록되었습니다.`);
+    }
+
+    function renderClickRaceLeaderboard() {
+      const tbody = document.getElementById('clickrace-leaderboard-body');
+      if (!tbody) return;
+
+      const scores = (state.clickRaceScores && state.clickRaceScores.length > 0) ? state.clickRaceScores : defaultState.clickRaceScores;
+
+      if (scores.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-medium">등록된 최고 기록이 없습니다. 첫 번째 광클 주자가 되어보세요!</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = scores.slice(0, 10).map((item, idx) => {
+        let rankBadge = `<span class="font-extrabold text-slate-500">${idx + 1}</span>`;
+        let rowBg = "hover:bg-slate-50";
+
+        if (idx === 0) {
+          rankBadge = `<span class="bg-yellow-400 text-yellow-950 font-black px-2 py-0.5 rounded-lg shadow-sm">🥇 1위</span>`;
+          rowBg = "bg-yellow-50/70 hover:bg-yellow-100/70";
+        } else if (idx === 1) {
+          rankBadge = `<span class="bg-slate-300 text-slate-900 font-black px-2 py-0.5 rounded-lg shadow-sm">🥈 2위</span>`;
+          rowBg = "bg-slate-50 hover:bg-slate-100";
+        } else if (idx === 2) {
+          rankBadge = `<span class="bg-amber-600 text-white font-black px-2 py-0.5 rounded-lg shadow-sm">🥉 3위</span>`;
+          rowBg = "bg-amber-50/40 hover:bg-amber-100/40";
+        }
+
+        return `
+          <tr class="${rowBg} transition">
+            <td class="p-3 text-center">${rankBadge}</td>
+            <td class="p-3 text-slate-600">${item.className}</td>
+            <td class="p-3 font-extrabold text-slate-900">${item.name}</td>
+            <td class="p-3 text-right font-black text-rose-600 text-base">${item.clicks}회</td>
+            <td class="p-3 text-center text-slate-400 text-xs">${item.date}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     function showToast(message, isError = false) {
       const toast = document.getElementById('toast-notification');
       const toastMsg = document.getElementById('toast-message');
@@ -1095,6 +1373,7 @@
       renderTodos();
       renderPraise();
       renderMoodLogTable();
+      renderClickRaceLeaderboard();
       loadDayTimetableEditor();
       renderMealEditor();
       renderTodoEditor();
@@ -1301,7 +1580,7 @@
     // 학급 전환 함수
     function selectClassroom(className) {
       state.className = className;
-      loadStateLocally(); // 덮어쓰기 없이 해당 학급 독자 데이터 바로 로딩
+      loadStateLocally(); // 해당 학급 독자 데이터 로딩
       initAutoSyncSystem(); // 학급 채널 전환
       renderAll();
       closeClassSelectModal();
@@ -1397,7 +1676,7 @@
       dispatchSyncData({
         type: 'COMMON_MEAL_UPDATE',
         payload: state.mealMenu
-      }, true);
+      }, true, `daechang_middle_school/common_meal`);
 
       renderMealMenu();
       showToast("전 학급 공통 급식 식단이 성공적으로 저장되었습니다! 🍽️");
