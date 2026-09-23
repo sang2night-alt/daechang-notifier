@@ -1652,74 +1652,84 @@
     function initDragAndDrop() {
       const grid = document.getElementById('card-grid');
       if (!grid) return;
+
       let draggedItem = null;
 
-      grid.addEventListener('dragstart', (e) => {
-        const item = e.target.closest('.grid-item');
-        if (item) {
-          draggedItem = item;
-          item.classList.add('dragging');
-        }
-      });
+      grid.querySelectorAll('.grid-item').forEach(item => {
+        item.setAttribute('draggable', 'true');
 
-      grid.addEventListener('dragend', (e) => {
-        const item = e.target.closest('.grid-item');
-        if (item) {
+        item.addEventListener('dragstart', (e) => {
+          draggedItem = item;
+          setTimeout(() => item.classList.add('dragging'), 0);
+        });
+
+        item.addEventListener('dragend', () => {
           item.classList.remove('dragging');
           draggedItem = null;
-        }
-      });
+          saveCardOrder();
+        });
 
-      grid.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const afterElement = getDragAfterElement(grid, e.clientY);
-        if (draggedItem) {
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          const afterElement = getDragAfterElement(grid, e.clientX, e.clientY);
           if (afterElement == null) {
             grid.appendChild(draggedItem);
           } else {
             grid.insertBefore(draggedItem, afterElement);
           }
-        }
-      });
-
-      function getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('.grid-item:not(.dragging)')];
-        return draggableElements.reduce((closest, child) => {
-          const box = child.getBoundingClientRect();
-          const offset = y - box.top - box.height / 2;
-          if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: child };
-          } else {
-            return closest;
-          }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-      }
-
-      document.querySelectorAll('.drag-handle').forEach(handle => {
-        const card = handle.closest('.grid-item');
-        if (card) {
-          card.setAttribute('draggable', 'true');
-        }
+        });
       });
     }
 
-    // INITIALIZATION ON PAGE LOAD / REFRESH
-    window.addEventListener('DOMContentLoaded', () => {
-      // 1. 저장되어 있는 마지막 선택 학급 정보 불러오기
-      const savedLastClass = localStorage.getItem('daechang_last_class');
-      if (savedLastClass) {
-        state.className = savedLastClass;
-      }
+    function getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.grid-item:not(.dragging)')];
 
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = x - box.left - box.width / 2 + y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    function saveCardOrder() {
+      const grid = document.getElementById('card-grid');
+      if (!grid) return;
+      const items = [...grid.querySelectorAll('.grid-item')];
+      const order = items.map(item => item.dataset.id);
+      localStorage.setItem('daechang_card_order', JSON.stringify(order));
+    }
+
+    function restoreCardOrder() {
+      const grid = document.getElementById('card-grid');
+      if (!grid) return;
+      const savedOrder = localStorage.getItem('daechang_card_order');
+      if (!savedOrder) return;
+      try {
+        const order = JSON.parse(savedOrder);
+        order.forEach(id => {
+          const item = grid.querySelector(`[data-id="${id}"]`);
+          if (item) grid.appendChild(item);
+        });
+      } catch(e){}
+    }
+
+    // INITIALIZATION ON LOAD
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedClass = localStorage.getItem('daechang_last_class');
+      if (savedClass) {
+        state.className = savedClass;
+      }
       loadStateLocally();
-      initAutoSyncSystem();
+      restoreCardOrder();
       renderAll();
+      initAutoSyncSystem();
       initDragAndDrop();
       updateDateTime();
       setInterval(updateDateTime, 1000);
-
-      // 2. 새로고침 시 직관적으로 반을 다시 확인/선택할 수 있도록 교실 선택 모달 자동 표시
-      openClassSelectModal();
     });
   </script>
 </body>
