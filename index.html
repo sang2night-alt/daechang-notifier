@@ -205,7 +205,7 @@
       <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-3xl p-6 shadow-md flex flex-wrap justify-between items-center gap-4">
         <div>
           <h2 class="text-xl sm:text-2xl font-black flex items-center">
-            <i class="fa-solid fa-utensils mr-3 text-amber-200"></i> 오늘의 맛있는 급식 식단
+            <i class="fa-solid fa-utensils mr-3 text-amber-200"></i> 오늘의 맛있는 급식 식단 (전 학급 공통)
           </h2>
           <p class="text-xs sm:text-sm text-amber-100 mt-1">대창중학교 영양 선생님이 준비한 건강한 급식 메뉴입니다.</p>
         </div>
@@ -290,7 +290,7 @@
         </div>
         
         <div class="flex items-center space-x-2 flex-wrap gap-1.5">
-          <button onclick="restoreDefaultData()" class="bg-rose-600 hover:bg-rose-500 text-white text-xs px-3 py-2 rounded-xl transition font-bold flex items-center" title="기초 시간표/급식 데이터 초기화 및 복구">
+          <button onclick="restoreDefaultData()" class="bg-rose-600 hover:bg-rose-500 text-white text-xs px-3 py-2 rounded-xl transition font-bold flex items-center" title="기초 시간표/설정 데이터 초기화 및 복구">
             <i class="fa-solid fa-rotate-left mr-1.5"></i> 데이터 복구
           </button>
           <button onclick="testSyncConnection()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-2 rounded-xl transition font-bold flex items-center">
@@ -439,17 +439,20 @@
         <!-- Meal & Todo Editor -->
         <div class="space-y-6">
 
-          <!-- Meal Editor -->
+          <!-- Meal Editor (공통 저장) -->
           <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-3">
-            <h3 class="text-base font-extrabold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
-              <i class="fa-solid fa-utensils text-amber-500 mr-2"></i> 급식 식단 관리
-            </h3>
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 class="text-base font-extrabold text-slate-800 flex items-center">
+                <i class="fa-solid fa-utensils text-amber-500 mr-2"></i> 급식 식단 관리
+              </h3>
+              <span class="text-[10px] bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded-md">전 학급 공통 적용</span>
+            </div>
             <div>
               <label class="block text-xs font-bold text-slate-600 mb-1">오늘의 메뉴 (줄바꿈 구분)</label>
               <textarea id="meal-editor-textarea" rows="3" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-amber-500"></textarea>
             </div>
             <button onclick="saveMealEditor()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold py-2.5 rounded-xl text-sm transition">
-              🍽️ 급식 식단 저장
+              🍽️ 공통 급식 식단 저장
             </button>
           </div>
 
@@ -492,7 +495,7 @@
       </div>
 
       <p class="text-xs text-slate-500 font-medium">
-        접속하고자 하는 학년과 반을 선택하세요. 각 학급마다 고유 시간표, 할 일, 칭찬 온도계 및 실시간 알림 채널이 독립 연결됩니다.
+        접속하고자 하는 학년과 반을 선택하세요. 각 학급마다 고유 시간표, 할 일, 칭찬 온도계 및 실시간 알림 채널이 독립 연결됩니다. (급식 식단은 공통 유지)
       </p>
 
       <!-- Grade Selector Buttons -->
@@ -602,7 +605,7 @@
     // GLOBAL APPLICATION STATE
     let state = JSON.parse(JSON.stringify(defaultState));
 
-    // REALTIME MQTT CLIENT OVER WEBSOCKET (WSS - Bypasses School Firewalls & Works Cross-Device)
+    // REALTIME MQTT CLIENT OVER WEBSOCKET
     let mqttClient = null;
     let clientId = 'daechang_' + Math.random().toString(16).substring(2, 10);
     let lastProcessedPacketId = null;
@@ -629,7 +632,6 @@
           ...(saved.cardSizes || {})
         },
         todos: Array.isArray(saved.todos) ? saved.todos : defaultState.todos,
-        mealMenu: Array.isArray(saved.mealMenu) ? saved.mealMenu : defaultState.mealMenu,
         moodLogs: Array.isArray(saved.moodLogs) ? saved.moodLogs : defaultState.moodLogs
       };
 
@@ -642,11 +644,18 @@
       return merged;
     }
 
-    // Save State Locally
+    // Save State Locally (학급별 독립 저장 + 급식 전 학급 공통 저장)
     function saveStateLocally(shouldBroadcast = true) {
       try {
         const classKey = getClassKey();
-        localStorage.setItem(`daechang_state_${classKey}`, JSON.stringify(state));
+        
+        // 1. 학급별 독립 데이터 저장 (급식 식단 제외)
+        const classSpecificState = { ...state };
+        delete classSpecificState.mealMenu;
+        localStorage.setItem(`daechang_state_${classKey}`, JSON.stringify(classSpecificState));
+
+        // 2. 급식 식단은 모든 학급 공통 저장
+        localStorage.setItem('daechang_shared_meal', JSON.stringify(state.mealMenu));
       } catch(e) {}
       
       if (shouldBroadcast) {
@@ -654,7 +663,7 @@
       }
     }
 
-    // Load State Locally
+    // Load State Locally (학급 개별 데이터 불러오기 + 공통 급식 합성)
     function loadStateLocally() {
       try {
         const classKey = getClassKey();
@@ -663,7 +672,18 @@
           const parsed = JSON.parse(savedRaw);
           state = mergeStateWithDefaults(parsed);
         } else {
-          state = mergeStateWithDefaults(state);
+          // 해당 학급 데이터가 없을 경우 기본 템플릿으로 신규 할당
+          const newClassState = JSON.parse(JSON.stringify(defaultState));
+          newClassState.className = state.className;
+          state = mergeStateWithDefaults(newClassState);
+        }
+
+        // 전 학급 공통 급식 식단 불러오기
+        const sharedMealRaw = localStorage.getItem('daechang_shared_meal');
+        if (sharedMealRaw) {
+          state.mealMenu = JSON.parse(sharedMealRaw);
+        } else {
+          state.mealMenu = [...defaultState.mealMenu];
         }
       } catch(e) {
         state = mergeStateWithDefaults(null);
@@ -672,20 +692,23 @@
 
     // Restore Default Data
     function restoreDefaultData() {
-      if (confirm(`현재 학급 [${state.className}]의 시간표 및 식단 데이터를 초기 상태로 복구하시겠습니까?`)) {
+      if (confirm(`현재 학급 [${state.className}]의 시간표 및 설정 데이터를 초기 상태로 복구하시겠습니까?`)) {
         const currentClass = state.className;
+        const sharedMeal = [...state.mealMenu]; // 공통 급식 데이터 유지
         state = JSON.parse(JSON.stringify(defaultState));
         state.className = currentClass;
+        state.mealMenu = sharedMeal;
         saveStateLocally(true);
         renderAll();
-        showToast("시간표 및 급식 데이터가 초기화 복구되었습니다! 🔄");
+        showToast("현재 학급 데이터가 초기화 복구되었습니다! 🔄");
       }
     }
 
     // Initialize MQTT Realtime Communication System
     function initAutoSyncSystem() {
       const classKey = getClassKey();
-      const topic = `daechang_middle_school/class_${classKey}`;
+      const topicClass = `daechang_middle_school/class_${classKey}`;
+      const topicCommonMeal = `daechang_middle_school/common_meal`;
       
       const indicatorLabel = document.getElementById('sync-channel-label');
       const indicatorDot = document.getElementById('sync-status-dot');
@@ -697,7 +720,7 @@
         try { mqttClient.end(true); } catch(e) {}
       }
 
-      // Public WSS Brokers (Port 8084/443 SSL - Bypass School Firewalls)
+      // Public WSS Broker (Port 8084 SSL - School Firewall Bypass)
       const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
 
       try {
@@ -713,9 +736,10 @@
           if (indicatorLabel) indicatorLabel.innerText = `${state.className} 실시간 연동 완료`;
           if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse";
 
-          mqttClient.subscribe(topic, { qos: 1 }, (err) => {
+          // 학급 개별 채널 + 공통 급식 채널 동시 구독
+          mqttClient.subscribe([topicClass, topicCommonMeal], { qos: 1 }, (err) => {
             if (!err) {
-              console.log(`Subscribed to classroom channel: ${topic}`);
+              console.log(`Subscribed to class & meal channels: ${topicClass}, ${topicCommonMeal}`);
             }
           });
         });
@@ -723,7 +747,7 @@
         mqttClient.on('message', (t, message) => {
           try {
             const packet = JSON.parse(message.toString());
-            if (packet.senderId === clientId) return; // Ignore own messages
+            if (packet.senderId === clientId) return; // 본인 전송 메시지 제외
             handleIncomingSyncPacket(packet);
           } catch(err) {
             console.error("Invalid packet:", err);
@@ -754,9 +778,19 @@
         showCallModal(packet.target, packet.reason, packet.isEmergency);
       } else if (packet.type === 'STATE_UPDATE') {
         if (packet.payload) {
+          const currentMeal = state.mealMenu;
           state = mergeStateWithDefaults(packet.payload);
+          state.mealMenu = currentMeal; // 공통 급식 보존
           saveStateLocally(false);
           renderAll();
+        }
+      } else if (packet.type === 'COMMON_MEAL_UPDATE') {
+        if (packet.payload && Array.isArray(packet.payload)) {
+          state.mealMenu = packet.payload;
+          localStorage.setItem('daechang_shared_meal', JSON.stringify(state.mealMenu));
+          renderMealMenu();
+          renderMealEditor();
+          showToast("🍱 공통 급식 식단이 실시간 업데이트되었습니다!");
         }
       } else if (packet.type === 'MOOD_SUBMIT') {
         if (packet.payload) {
@@ -773,9 +807,9 @@
       }
     }
 
-    function dispatchSyncData(packet) {
+    function dispatchSyncData(packet, isCommonMeal = false) {
       const classKey = getClassKey();
-      const topic = `daechang_middle_school/class_${classKey}`;
+      const topic = isCommonMeal ? `daechang_middle_school/common_meal` : `daechang_middle_school/class_${classKey}`;
       const payloadWithMeta = { 
         ...packet, 
         senderId: clientId,
@@ -803,7 +837,6 @@
           className: state.className,
           praiseTemp: state.praiseTemp,
           praiseMsg: state.praiseMsg,
-          mealMenu: state.mealMenu,
           todos: state.todos,
           timetable: state.timetable,
           moodLogs: state.moodLogs,
@@ -813,14 +846,18 @@
     }
 
     // AUDIO SYNTHESIZER FOR CALLS & EMERGENCY SIREN
+    function initAudioContextOnGesture() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+    }
+
     function playAudioChime(isEmergency = false) {
       try {
-        if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioContext.state === 'suspended') {
-          audioContext.resume();
-        }
+        initAudioContextOnGesture();
 
         if (currentOscillator) {
           try { currentOscillator.stop(); } catch(e) {}
@@ -865,8 +902,11 @@
     function switchTab(tab) {
       if (tab === 'teacher' && !state.isTeacherAuthenticated) {
         document.getElementById('pin-modal').classList.remove('hidden');
-        document.getElementById('pin-input').value = '';
-        document.getElementById('pin-input').focus();
+        const pinInput = document.getElementById('pin-input');
+        if (pinInput) {
+          pinInput.value = '';
+          pinInput.focus();
+        }
         return;
       }
 
@@ -1035,11 +1075,20 @@
 
     // RENDER ALL VIEWS
     function renderAll() {
-      document.getElementById('current-class-label').innerText = state.className;
-      document.getElementById('mood-board-class-name').innerText = state.className;
-      document.getElementById('teacher-current-class-badge').innerText = `${state.className} 관리 중`;
-      document.getElementById('call-target-class-name').innerText = state.className;
-      document.getElementById('emergency-target-class-label').innerText = state.className;
+      const classLabel = document.getElementById('current-class-label');
+      if (classLabel) classLabel.innerText = state.className;
+
+      const moodClassName = document.getElementById('mood-board-class-name');
+      if (moodClassName) moodClassName.innerText = state.className;
+
+      const teacherBadge = document.getElementById('teacher-current-class-badge');
+      if (teacherBadge) teacherBadge.innerText = `${state.className} 관리 중`;
+
+      const callTargetBadge = document.getElementById('call-target-class-name');
+      if (callTargetBadge) callTargetBadge.innerText = state.className;
+
+      const emergencyBadge = document.getElementById('emergency-target-class-label');
+      if (emergencyBadge) emergencyBadge.innerText = state.className;
 
       renderTimetable();
       renderMealMenu();
@@ -1117,7 +1166,8 @@
       const container = document.getElementById('todo-list-display');
       if (!container) return;
       const activeCount = state.todos.filter(t => !t.done).length;
-      document.getElementById('todo-count-badge').innerText = `${activeCount}개 남음`;
+      const todoBadge = document.getElementById('todo-count-badge');
+      if (todoBadge) todoBadge.innerText = `${activeCount}개 남음`;
 
       if (state.todos.length === 0) {
         container.innerHTML = `<li class="text-slate-400 text-xs text-center py-6">등록된 할 일이 없습니다.</li>`;
@@ -1134,11 +1184,20 @@
     }
 
     function renderPraise() {
-      document.getElementById('praise-temp-display').innerText = state.praiseTemp;
-      document.getElementById('praise-bar-display').style.width = `${Math.min(100, Math.max(0, state.praiseTemp))}%`;
-      document.getElementById('praise-msg-display').innerText = state.praiseMsg;
-      document.getElementById('praise-temp-input').value = state.praiseTemp;
-      document.getElementById('praise-msg-input').value = state.praiseMsg;
+      const tempDisplay = document.getElementById('praise-temp-display');
+      if (tempDisplay) tempDisplay.innerText = state.praiseTemp;
+
+      const barDisplay = document.getElementById('praise-bar-display');
+      if (barDisplay) barDisplay.style.width = `${Math.min(100, Math.max(0, state.praiseTemp))}%`;
+
+      const msgDisplay = document.getElementById('praise-msg-display');
+      if (msgDisplay) msgDisplay.innerText = state.praiseMsg;
+
+      const tempInput = document.getElementById('praise-temp-input');
+      if (tempInput) tempInput.value = state.praiseTemp;
+
+      const msgInput = document.getElementById('praise-msg-input');
+      if (msgInput) msgInput.value = state.praiseMsg;
     }
 
     function renderMoodLogTable() {
@@ -1239,30 +1298,31 @@
       }
     }
 
+    // 학급 전환 함수
     function selectClassroom(className) {
       state.className = className;
-      saveStateLocally(false);
-      loadStateLocally();
-      initAutoSyncSystem();
+      loadStateLocally(); // 덮어쓰기 없이 해당 학급 독자 데이터 바로 로딩
+      initAutoSyncSystem(); // 학급 채널 전환
       renderAll();
       closeClassSelectModal();
       showToast(`[${className}] 교실로 전환되었습니다. 🏫`);
     }
 
     function applyCustomClass() {
-      const input = document.getElementById('custom-class-input').value.trim();
-      if (input) {
-        selectClassroom(input);
+      const input = document.getElementById('custom-class-input');
+      if (input && input.value.trim()) {
+        selectClassroom(input.value.trim());
+        input.value = '';
       }
     }
 
     // TEACHER EDITORS logic
     function addTodoItem() {
       const input = document.getElementById('new-todo-input');
-      const text = input.value.trim();
+      const text = input ? input.value.trim() : '';
       if (!text) return;
       state.todos.push({ id: Date.now(), text: text, done: false });
-      input.value = '';
+      if (input) input.value = '';
       saveStateLocally(true); renderTodos(); renderTodoEditor();
       showToast("새 할 일이 추가되었습니다. 📝");
     }
@@ -1284,7 +1344,7 @@
       if (!container) return;
       container.innerHTML = state.todos.map(t => `
         <li class="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200">
-          <span class="font-medium text-slate-700">${t.text}</span>
+          <span class="font-medium text-slate-700 text-xs sm:text-sm">${t.text}</span>
           <button onclick="deleteTodo(${t.id})" class="text-rose-500 hover:text-rose-700 font-bold px-2 py-1 text-xs">삭제</button>
         </li>
       `).join('');
@@ -1310,7 +1370,8 @@
       const day = document.getElementById('timetable-day-select').value;
       const updated = [];
       for (let i = 0; i < 8; i++) {
-        updated.push(document.getElementById(`tt-edit-${i}`).value.trim() || "-");
+        const inputEl = document.getElementById(`tt-edit-${i}`);
+        updated.push(inputEl ? inputEl.value.trim() || "-" : "-");
       }
       state.timetable[day] = updated;
       saveStateLocally(true);
@@ -1323,17 +1384,31 @@
       if (area) area.value = state.mealMenu.join('\n');
     }
 
+    // 전 학급 공통 급식 저장 로직
     function saveMealEditor() {
-      const val = document.getElementById('meal-editor-textarea').value;
+      const area = document.getElementById('meal-editor-textarea');
+      const val = area ? area.value : '';
       state.mealMenu = val.split('\n').map(s => s.trim()).filter(Boolean);
-      saveStateLocally(true);
+      
+      // 공통 스토리지 저장
+      localStorage.setItem('daechang_shared_meal', JSON.stringify(state.mealMenu));
+      
+      // 공통 MQTT 채널로 전 학급 및 타 기기 실시간 전파
+      dispatchSyncData({
+        type: 'COMMON_MEAL_UPDATE',
+        payload: state.mealMenu
+      }, true);
+
       renderMealMenu();
-      showToast("급식 식단이 저장되었습니다! 🍽️");
+      showToast("전 학급 공통 급식 식단이 성공적으로 저장되었습니다! 🍽️");
     }
 
     function savePraiseSettings() {
-      state.praiseTemp = parseInt(document.getElementById('praise-temp-input').value) || 0;
-      state.praiseMsg = document.getElementById('praise-msg-input').value;
+      const tempInput = document.getElementById('praise-temp-input');
+      const msgInput = document.getElementById('praise-msg-input');
+
+      state.praiseTemp = parseInt(tempInput ? tempInput.value : 0) || 0;
+      state.praiseMsg = msgInput ? msgInput.value : '';
       saveStateLocally(true);
       renderPraise();
       showToast("칭찬 온도계 설정이 저장되었습니다! 🌡️");
@@ -1368,6 +1443,59 @@
       );
     }
 
+    // KEYBOARD SHORTCUTS & USER GESTURE LISTENERS
+    function setupKeyboardAndGestureListeners() {
+      // Enter key shortcuts
+      const pinInput = document.getElementById('pin-input');
+      if (pinInput) {
+        pinInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') verifyPin();
+        });
+      }
+
+      const customClassInput = document.getElementById('custom-class-input');
+      if (customClassInput) {
+        customClassInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') applyCustomClass();
+        });
+      }
+
+      const todoInput = document.getElementById('new-todo-input');
+      if (todoInput) {
+        todoInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') addTodoItem();
+        });
+      }
+
+      const callReasonInput = document.getElementById('call-reason');
+      if (callReasonInput) {
+        callReasonInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') sendStudentCall(false);
+        });
+      }
+
+      const emergencyReasonInput = document.getElementById('emergency-reason');
+      if (emergencyReasonInput) {
+        emergencyReasonInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') sendStudentCall(true);
+        });
+      }
+
+      // Close modal on ESC key
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closePinModal();
+          closeClassSelectModal();
+          stopAudioAndCloseModal();
+        }
+      });
+
+      // Audio context unlock on user interaction
+      ['click', 'keydown', 'touchstart'].forEach(evt => {
+        document.addEventListener(evt, initAudioContextOnGesture, { once: true });
+      });
+    }
+
     // APP INITIALIZATION
     window.onload = function() {
       loadStateLocally();
@@ -1375,6 +1503,7 @@
       renderAll();
       setupDragAndDrop();
       setupIdleTimer();
+      setupKeyboardAndGestureListeners();
       updateClock();
       setInterval(updateClock, 10000);
     };
