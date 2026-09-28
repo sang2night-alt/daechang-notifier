@@ -339,6 +339,29 @@
         </span>
       </div>
 
+      <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+          <h3 class="text-base font-extrabold text-slate-800 flex items-center">
+            <i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> 전학급 실시간 광클 명예의 전당 TOP 10
+          </h3>
+          <span class="text-[11px] bg-yellow-100 text-yellow-800 font-extrabold px-2.5 py-1 rounded-lg">전교 공통 랭킹</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                <th class="p-3 rounded-l-xl text-center w-14">순위</th>
+                <th class="p-3">학급</th>
+                <th class="p-3">이름</th>
+                <th class="p-3 text-right">최고 기록</th>
+                <th class="p-3 rounded-r-xl text-center">날짜</th>
+              </tr>
+            </thead>
+            <tbody id="clickrace-leaderboard-body" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-5 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between space-y-5">
           <div>
@@ -397,6 +420,17 @@
         </span>
       </div>
 
+<div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+          <h3 class="text-base font-extrabold text-slate-800 flex items-center"><i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> 반응속도 명예의 전당 TOP 5</h3>
+          <span class="text-[11px] bg-cyan-100 text-cyan-800 font-extrabold px-2.5 py-1 rounded-lg">학급별 최고 기록</span>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left text-xs sm:text-sm">
+          <thead><tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200"><th class="p-3 text-center w-14">순위</th><th class="p-3">학급</th><th class="p-3 text-right">최고 기록</th><th class="p-3 text-center">날짜</th></tr></thead>
+          <tbody id="reaction-leaderboard-body" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
+        </table></div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-5 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
           <h3 class="text-base font-extrabold text-slate-800 border-b border-slate-100 pb-3 flex items-center">
@@ -443,16 +477,7 @@
         </div>
       </div>
 
-      <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4 mt-6">
-        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-          <h3 class="text-base font-extrabold text-slate-800 flex items-center"><i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> 반응속도 명예의 전당 TOP 5</h3>
-          <span class="text-[11px] bg-cyan-100 text-cyan-800 font-extrabold px-2.5 py-1 rounded-lg">학급별 최고 기록</span>
-        </div>
-        <div class="overflow-x-auto"><table class="w-full text-left text-xs sm:text-sm">
-          <thead><tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200"><th class="p-3 text-center w-14">순위</th><th class="p-3">학급</th><th class="p-3 text-right">최고 기록</th><th class="p-3 text-center">날짜</th></tr></thead>
-          <tbody id="reaction-leaderboard-body" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
-        </table></div>
-      </div>
+      
     </section>
 
     <!-- VIEW 4: TEACHER DASHBOARD -->
@@ -1702,15 +1727,17 @@
       try {
         const user = await ensureReactionAuth();
         const roomRef = firebaseDb.ref(`reactionRooms/${challenge.roomId}`);
-        let joined = false;
         const result = await roomRef.transaction(room => {
           if (!room || room.status !== 'waiting' || !room.players || !room.players.p1 || room.players.p2) return;
           if (room.players.p1.className === state.className) return;
           room.players.p2 = { uid:user.uid, className:state.className, ready:false, result:null };
-          joined = true;
           return room;
         });
-        if (!result.committed || !joined) {
+        const acceptedRoom = result.snapshot && result.snapshot.val ? result.snapshot.val() : null;
+        const acceptedP2 = acceptedRoom && acceptedRoom.players ? acceptedRoom.players.p2 : null;
+        const acceptedByMe = !!(result.committed && acceptedP2 &&
+          acceptedP2.uid === user.uid && acceptedP2.className === state.className);
+        if (!acceptedByMe) {
           showToast('다른 학급이 먼저 도전장을 수락했습니다.', true);
           hideReactionChallengeModal(); pendingReactionChallenge = null; return;
         }
