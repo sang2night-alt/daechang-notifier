@@ -442,7 +442,6 @@
           <div class="text-center text-[11px] text-slate-400 font-medium">두 학급 모두 준비 완료 후 신호가 나올 때까지 기다리세요. 먼저 누르면 부정 출발입니다.</div>
         </div>
       </div>
-    </section>
 
       <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4 mt-6">
         <div class="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -1794,6 +1793,69 @@
     }
 
     // RENDER ALL VIEWS
+
+    function normalizeReactionScores(value) {
+      if (Array.isArray(value)) return value;
+      if (value && Array.isArray(value.items)) return value.items;
+      return [];
+    }
+
+    async function saveReactionClassBest(className, result) {
+      if (!className || !result || typeof result.ms !== 'number' || !Number.isFinite(result.ms)) return;
+      const scoreRef = firebaseDb.ref('common/reactionScores');
+      const now = new Date();
+      const date = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      await scoreRef.transaction(current => {
+        const scores = normalizeReactionScores(current);
+        const next = scores.filter(item => item && item.className !== className);
+        const previous = scores.find(item => item && item.className === className);
+
+        if (!previous || Number(result.ms) < Number(previous.ms)) {
+          next.push({ className, ms: Math.round(Number(result.ms)), date });
+        } else {
+          next.push(previous);
+        }
+
+        next.sort((a, b) => Number(a.ms) - Number(b.ms));
+        return { items: next.slice(0, 30) };
+      });
+    }
+
+    function renderReactionLeaderboard() {
+      const tbody = document.getElementById('reaction-leaderboard-body');
+      if (!tbody) return;
+
+      const bestByClass = new Map();
+      normalizeReactionScores(state.reactionScores).forEach(item => {
+        if (!item || !item.className || typeof item.ms !== 'number') return;
+        const prev = bestByClass.get(item.className);
+        if (!prev || item.ms < prev.ms) bestByClass.set(item.className, item);
+      });
+
+      const scores = [...bestByClass.values()]
+        .sort((a, b) => Number(a.ms) - Number(b.ms))
+        .slice(0, 5);
+
+      if (scores.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-medium">아직 등록된 학급 기록이 없습니다.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = scores.map((item, idx) => {
+        const medals = ['🥇', '🥈', '🥉'];
+        const rank = medals[idx] ? `${medals[idx]} ${idx + 1}위` : `${idx + 1}위`;
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-3 text-center font-black">${rank}</td>
+            <td class="p-3 font-extrabold text-slate-800">${item.className}</td>
+            <td class="p-3 text-right font-black text-cyan-700 text-base">${Math.round(item.ms)}ms</td>
+            <td class="p-3 text-center text-slate-400 text-xs">${item.date || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     function renderAll() {
       const classLabel = document.getElementById('current-class-label');
       if (classLabel) classLabel.innerText = state.className;
@@ -2282,6 +2344,7 @@
       state.className = newClassName;
       localStorage.setItem('daechang_last_class', newClassName);
       loadStateLocally();
+      state.className = newClassName;
       initAutoSyncSystem();
       renderAll();
       closeClassSelectModal();
@@ -2389,6 +2452,7 @@
         state.className = savedClass;
       }
       loadStateLocally();
+      if (savedClass) state.className = savedClass;
       restoreCardOrder();
       renderAll();
       initDragAndDrop();
