@@ -1726,18 +1726,17 @@
       const btn = document.getElementById('reaction-challenge-accept-btn');
       if (btn) btn.disabled = true;
 
-      const challengeRef = firebaseDb.ref('reactionChallenge');
       const roomRef = firebaseDb.ref(`reactionRooms/${challenge.roomId}`);
-      let claimSucceeded = false;
+      const challengeRef = firebaseDb.ref('reactionChallenge');
 
       try {
         await ensureReactionAuth();
 
-        // 1. 실제 방이 아직 존재하고 도전 대기 상태인지 먼저 확인한다.
+        // 방의 현재 상태를 Firebase에서 직접 확인한다.
         const roomSnap = await roomRef.once('value');
         const room = roomSnap.val();
 
-        if (!room || room.status !== 'waiting' || !room.players || !room.players.p1) {
+        if (!room || !room.players || !room.players.p1) {
           showToast('도전장이 만료되었거나 대전방이 종료되었습니다.', true);
           hideReactionChallengeModal();
           pendingReactionChallenge = null;
@@ -1751,117 +1750,96 @@
           return;
         }
 
-        // 이미 실제 p2가 있으면 그때만 "다른 학급이 먼저 수락"으로 판단한다.
-        if (room.players.p2) {
+        const existingP2 = room.players.p2 || null;
+
+        // 중요: 이전 수락 시도에서 p2 저장까지 성공했지만 이후 화면 연결이 끊긴 경우,
+        // 같은 학급을 "다른 학급"으로 오판하지 않고 기존 p2 자리를 그대로 복구 연결한다.
+        if (existingP2) {
+          const p2IsMine =
+            existingP2.clientId === clientId ||
+            existingP2.className === state.className;
+
+          if (p2IsMine) {
+            hideReactionChallengeModal();
+            pendingReactionChallenge = null;
+            switchTab('gamecenter');
+            switchGameCenter('reaction');
+            await enterReactionRoom(challenge.roomId, 'p2');
+            showToast(`⚡ ${room.players.p1.className}과(와) 대전에 연결되었습니다!`);
+            return;
+          }
+
+          // 실제로 다른 학급 p2가 존재할 때만 이 메시지를 표시한다.
           showToast('다른 학급이 먼저 도전장을 수락했습니다.', true);
           hideReactionChallengeModal();
           pendingReactionChallenge = null;
           return;
         }
 
-        // 2. 전역 도전장을 clientId로 선점한다.
-        // Firebase transaction 콜백의 외부 변수/인증 UID에 의존하지 않고,
-        // transaction 결과 snapshot에 기록된 acceptedClientId로 최종 판정한다.
-        const claimResult = await challengeRef.transaction(current => {
-          if (!current || current.roomId !== challenge.roomId) return;
-          if (current.status !== 'open') return;
-          current.status = 'claiming';
-          current.acceptedClientId = clientId;
-          current.acceptedBy = state.className;
-          current.claimedAt = firebase.database.ServerValue.TIMESTAMP;
-          return current;
+        if (room.status !== 'waiting') {
+          showToast('현재 수락할 수 없는 대전 상태입니다.', true);
+          hideReactionChallengeModal();
+          pendingReactionChallenge = null;
+          return;
+        }
+
+        // p2 한 자리만 transaction으로 경쟁시킨다.
+        // 방 전체나 전역 challenge 상태를 선점하지 않아 불필요한 충돌을 없앤다.
+        const p2Ref = roomRef.child('players/p2');
+        const p2Result = await p2Ref.transaction(current => {
+          if (current) return;
+          return {
+            clientId: clientId,
+            className: state.className,
+            ready: false,
+            result: null
+          };
         });
 
-        const claimed = claimResult.snapshot ? claimResult.snapshot.val() : null;
-        claimSucceeded = !!(
-          claimResult.committed &&
-          claimed &&
-          claimed.roomId === challenge.roomId &&
-          claimed.status === 'claiming' &&
-          claimed.acceptedClientId === clientId
+        const finalP2 = p2Result.snapshot ? p2Result.snapshot.val() : null;
+        const acceptedByMe = !!(
+          finalP2 &&
+          (finalP2.clientId === clientId || finalP2.className === state.className)
         );
 
-        if (!claimSucceeded) {
-          // 선점 실패 시 실제 방을 다시 읽어서 정말 다른 학급이 들어왔는지 구분한다.
-          const latestRoom = (await roomRef.once('value')).val();
-          if (latestRoom && latestRoom.players && latestRoom.players.p2) {
+        if (!acceptedByMe) {
+          // transaction 결과에 실제 다른 학급 p2가 있을 때만 경쟁 패배로 처리한다.
+          if (finalP2 && finalP2.className && finalP2.className !== state.className) {
             showToast('다른 학급이 먼저 도전장을 수락했습니다.', true);
           } else {
-            showToast('도전장 연결 상태가 변경되었습니다. 다시 도전장을 보내주세요.', true);
+            showToast('도전 수락 연결에 실패했습니다. 다시 시도해주세요.', true);
           }
           hideReactionChallengeModal();
           pendingReactionChallenge = null;
           return;
         }
 
-        // 3. 선점한 학급을 p2로 등록한다.
-        // 선점 자체가 동시 수락을 막으므로 여기서는 불필요한 room transaction을 사용하지 않는다.
-        await roomRef.child('players/p2').set({
-          clientId: clientId,
-          className: state.className,
-          ready: false,
-          result: null
-        });
-
-        // 4. p2 등록을 실제 Firebase 값으로 검증한다.
-        const verifySnap = await roomRef.child('players/p2').once('value');
-        const verifiedP2 = verifySnap.val();
-
-        if (!verifiedP2 ||
-            verifiedP2.clientId !== clientId ||
-            verifiedP2.className !== state.className) {
-          throw new Error('REACTION_P2_VERIFY_FAILED');
+        // challenge 표시는 부가 상태일 뿐, 실제 대전 참가 판정에는 사용하지 않는다.
+        // 내가 p2를 확보한 뒤에만 accepted 상태로 갱신한다.
+        try {
+          await challengeRef.transaction(current => {
+            if (!current || current.roomId !== challenge.roomId) return current;
+            current.status = 'accepted';
+            current.acceptedClientId = clientId;
+            current.acceptedBy = state.className;
+            current.acceptedAt = firebase.database.ServerValue.TIMESTAMP;
+            return current;
+          });
+        } catch (challengeUpdateError) {
+          console.warn('Challenge status update skipped:', challengeUpdateError);
         }
-
-        // 5. 연결 완료 후 도전장 상태를 accepted로 확정한다.
-        await challengeRef.transaction(current => {
-          if (!current ||
-              current.roomId !== challenge.roomId ||
-              current.acceptedClientId !== clientId) return current;
-          current.status = 'accepted';
-          current.acceptedBy = state.className;
-          current.acceptedAt = firebase.database.ServerValue.TIMESTAMP;
-          return current;
-        });
 
         hideReactionChallengeModal();
         pendingReactionChallenge = null;
 
-        // 기존 디자인/메뉴 구조 그대로: 게임센터 > 반응속도 배틀로 이동 후 방 연결
         switchTab('gamecenter');
         switchGameCenter('reaction');
         await enterReactionRoom(challenge.roomId, 'p2');
 
-        showToast(`⚡ ${challenge.fromClass}의 도전을 수락했습니다!`);
+        showToast(`⚡ ${room.players.p1.className}의 도전을 수락했습니다!`);
 
       } catch(e) {
         console.error('Reaction challenge accept failed:', e);
-
-        // p2 등록 전에 실패했거나 검증 실패한 경우 내가 잡은 도전장만 원상복구한다.
-        if (claimSucceeded) {
-          try {
-            const p2Snap = await roomRef.child('players/p2').once('value');
-            const p2 = p2Snap.val();
-
-            if (!p2 || p2.clientId !== clientId) {
-              await challengeRef.transaction(current => {
-                if (!current ||
-                    current.roomId !== challenge.roomId ||
-                    current.acceptedClientId !== clientId ||
-                    current.status === 'accepted') return current;
-
-                current.status = 'open';
-                delete current.acceptedClientId;
-                delete current.acceptedBy;
-                delete current.claimedAt;
-                return current;
-              });
-            }
-          } catch(recoveryError) {
-            console.error('Reaction challenge recovery failed:', recoveryError);
-          }
-        }
-
         showToast('도전 수락 중 연결 오류가 발생했습니다. 다시 시도해주세요.', true);
       } finally {
         if (btn) btn.disabled = false;
