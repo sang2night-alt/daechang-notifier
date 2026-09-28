@@ -699,6 +699,22 @@
       return name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
     }
 
+    function normalizeClickRaceScores(value) {
+      if (Array.isArray(value)) return value;
+      if (value && Array.isArray(value.items)) return value.items;
+      return [];
+    }
+
+    function getFirebaseClassState() {
+      return {
+        timetable: state.timetable,
+        todos: state.todos,
+        praiseTemp: state.praiseTemp,
+        praiseMsg: state.praiseMsg,
+        moodLogs: state.moodLogs
+      };
+    }
+
     function mergeStateWithDefaults(saved) {
       if (!saved || typeof saved !== 'object') return JSON.parse(JSON.stringify(defaultState));
 
@@ -733,6 +749,7 @@
         const classSpecificState = { ...state };
         delete classSpecificState.mealMenu;
         delete classSpecificState.clickRaceScores;
+        delete classSpecificState.selectedTimetableDay;
         localStorage.setItem(`daechang_state_${classKey}`, JSON.stringify(classSpecificState));
 
         localStorage.setItem('daechang_shared_meal', JSON.stringify(state.mealMenu));
@@ -756,6 +773,9 @@
           newClassState.className = state.className;
           state = mergeStateWithDefaults(newClassState);
         }
+
+        // 새로 열 때는 저장된 수동 요일 선택을 이어받지 않고 오늘 요일을 자동 표시한다.
+        state.selectedTimetableDay = null;
 
         const sharedMealRaw = localStorage.getItem('daechang_shared_meal');
         if (sharedMealRaw) {
@@ -790,18 +810,20 @@
       }
     }
 
-    function resetClickRaceScores() {
+    async function resetClickRaceScores() {
       if (confirm("전학급 광클 레이스 명예의 전당 기록을 초기화하시겠습니까?")) {
         state.clickRaceScores = [];
-        localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
-        
-        dispatchSyncData({
-          type: 'COMMON_CLICKRACE_UPDATE',
-          payload: state.clickRaceScores
-        }, true, `daechang_middle_school/common_clickrace`);
-
+        localStorage.setItem('daechang_shared_clickrace', JSON.stringify([]));
         renderClickRaceLeaderboard();
-        showToast("광클 레이스 명예의 전당 기록이 초기화되었습니다. 🏆");
+        try {
+          if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+          // Firebase에서 빈 배열은 노드 삭제(null)로 취급될 수 있으므로 items 래퍼를 사용한다.
+          await firebaseDb.ref('common/clickRaceScores').set({ items: [] });
+          showToast("광클 레이스 명예의 전당 기록이 초기화되었습니다. 🏆");
+        } catch (e) {
+          console.error('Click race reset failed:', e);
+          showToast("광클 기록 초기화 중 Firebase 저장에 실패했습니다.", true);
+        }
       }
     }
 
@@ -849,8 +871,15 @@
         if (classSnap.exists()) {
           const currentMeal = state.mealMenu;
           const currentScores = state.clickRaceScores;
-          state = mergeStateWithDefaults(classSnap.val());
-          state.className = state.className || classSnap.val().className || defaultState.className;
+          const localUiState = {
+            className: state.className,
+            pin: state.pin,
+            isTeacherAuthenticated: state.isTeacherAuthenticated,
+            currentTab: state.currentTab,
+            idleTimer: state.idleTimer,
+            cardSizes: state.cardSizes
+          };
+          state = mergeStateWithDefaults({ ...state, ...classSnap.val(), ...localUiState, selectedTimetableDay: null });
           state.mealMenu = currentMeal;
           state.clickRaceScores = currentScores;
           saveStateLocally(false);
@@ -866,20 +895,28 @@
         }
 
         if (scoreSnap.exists()) {
-          state.clickRaceScores = scoreSnap.val() || [];
+          state.clickRaceScores = normalizeClickRaceScores(scoreSnap.val());
           localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
         } else {
-          await scoreRef.set(state.clickRaceScores || []);
+          await scoreRef.set({ items: state.clickRaceScores || [] });
         }
 
         renderAll();
 
         const classCallback = snap => {
           if (!snap.exists()) return;
-          const remote = snap.val();
+          const remote = snap.val() || {};
           const currentMeal = state.mealMenu;
           const currentScores = state.clickRaceScores;
-          state = mergeStateWithDefaults(remote);
+          const localUiState = {
+            className: state.className,
+            pin: state.pin,
+            isTeacherAuthenticated: state.isTeacherAuthenticated,
+            currentTab: state.currentTab,
+            idleTimer: state.idleTimer,
+            cardSizes: state.cardSizes
+          };
+          state = mergeStateWithDefaults({ ...state, ...remote, ...localUiState, selectedTimetableDay: null });
           state.mealMenu = currentMeal;
           state.clickRaceScores = currentScores;
           saveStateLocally(false);
@@ -898,7 +935,7 @@
 
         const scoreCallback = snap => {
           if (!snap.exists()) return;
-          state.clickRaceScores = snap.val() || [];
+          state.clickRaceScores = normalizeClickRaceScores(snap.val());
           localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
           renderClickRaceLeaderboard();
         };
@@ -961,7 +998,7 @@
         }
       } else if (packet.type === 'COMMON_CLICKRACE_UPDATE') {
         if (packet.payload && Array.isArray(packet.payload)) {
-          state.clickRaceScores = packet.payload;
+          state.clickRaceScores = normalizeClickRaceScores(packet.payload);
           localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
           renderClickRaceLeaderboard();
           showToast("🏆 광클 명예의 전당 랭킹이 실시간 갱신되었습니다!");
@@ -984,12 +1021,9 @@
     async function writeClassStateToFirebase() {
       if (!firebaseAuth.currentUser) return;
       const classKey = getClassKey();
-      const classSpecificState = { ...state };
-      delete classSpecificState.mealMenu;
-      delete classSpecificState.clickRaceScores;
-      delete classSpecificState.isTeacherAuthenticated;
-      delete classSpecificState.idleTimer;
-      await firebaseDb.ref(`classes/${classKey}`).set(classSpecificState);
+      // 서버에는 여러 기기가 공유해야 하는 학급 데이터만 저장한다.
+      // PIN, 인증 상태, 현재 탭, 선택 요일, 카드 크기 등 기기/UI 상태는 Firebase에 올리지 않는다.
+      await firebaseDb.ref(`classes/${classKey}`).set(getFirebaseClassState());
     }
 
     async function dispatchSyncData(packet, isCommonTopic = false, topicName = '') {
@@ -1012,7 +1046,7 @@
           return;
         }
         if (packet.type === 'COMMON_CLICKRACE_UPDATE') {
-          await firebaseDb.ref('common/clickRaceScores').set(packet.payload || []);
+          await firebaseDb.ref('common/clickRaceScores').set({ items: packet.payload || [] });
           return;
         }
         if (packet.type === 'MOOD_SUBMIT') {
