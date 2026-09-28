@@ -817,8 +817,12 @@
         renderClickRaceLeaderboard();
         try {
           if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
-          // Firebase에서 빈 배열은 노드 삭제(null)로 취급될 수 있으므로 items 래퍼를 사용한다.
-          await firebaseDb.ref('common/clickRaceScores').set({ items: [] });
+          // 빈 배열만 저장하면 Firebase에서 노드 자체가 사라져, 다른 기기의 오래된 로컬 기록이
+          // 다시 서버를 초기화하는 문제가 생길 수 있다. resetAt을 남겨 "초기화된 빈 상태"를 영구 표시한다.
+          await firebaseDb.ref('common/clickRaceScores').set({
+            resetAt: firebase.database.ServerValue.TIMESTAMP,
+            items: null
+          });
           showToast("광클 레이스 명예의 전당 기록이 초기화되었습니다. 🏆");
         } catch (e) {
           console.error('Click race reset failed:', e);
@@ -895,10 +899,14 @@
         }
 
         if (scoreSnap.exists()) {
+          // 서버 기록이 항상 기준이다. resetAt만 있고 items가 없으면 "정상적으로 초기화된 빈 기록"이다.
           state.clickRaceScores = normalizeClickRaceScores(scoreSnap.val());
           localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
         } else {
-          await scoreRef.set({ items: state.clickRaceScores || [] });
+          // DB가 비어 있어도 학급 PC의 오래된 localStorage 기록을 서버로 되살리지 않는다.
+          state.clickRaceScores = [];
+          localStorage.setItem('daechang_shared_clickrace', JSON.stringify([]));
+          await scoreRef.set({ resetAt: firebase.database.ServerValue.TIMESTAMP });
         }
 
         renderAll();
@@ -934,8 +942,8 @@
         trackFirebaseListener(mealRef, 'value', mealCallback);
 
         const scoreCallback = snap => {
-          if (!snap.exists()) return;
-          state.clickRaceScores = normalizeClickRaceScores(snap.val());
+          // 삭제/초기화 이벤트도 반드시 빈 기록으로 반영해 로컬의 과거 점수가 살아나지 않게 한다.
+          state.clickRaceScores = snap.exists() ? normalizeClickRaceScores(snap.val()) : [];
           localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
           renderClickRaceLeaderboard();
         };
@@ -1046,7 +1054,7 @@
           return;
         }
         if (packet.type === 'COMMON_CLICKRACE_UPDATE') {
-          await firebaseDb.ref('common/clickRaceScores').set({ items: packet.payload || [] });
+          // 전체 목록 덮어쓰기는 사용하지 않는다. 오래된 기기의 로컬 목록이 초기화 기록을 되살리는 것을 방지한다.
           return;
         }
         if (packet.type === 'MOOD_SUBMIT') {
@@ -1377,17 +1385,33 @@
         date: dateStr
       };
 
+      // 화면에는 즉시 반영하되, 서버 저장은 현재 Firebase 목록을 기준으로 transaction 처리한다.
+      // 따라서 초기화 전의 오래된 localStorage 목록 전체가 다시 DB로 올라갈 수 없다.
       state.clickRaceScores.push(newEntry);
       state.clickRaceScores.sort((a, b) => b.clicks - a.clicks);
       state.clickRaceScores = state.clickRaceScores.slice(0, 20);
-
       localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
-      dispatchSyncData({
-        type: 'COMMON_CLICKRACE_UPDATE',
-        payload: state.clickRaceScores
-      }, true, `daechang_middle_school/common_clickrace`);
-
       renderClickRaceLeaderboard();
+
+      (async () => {
+        try {
+          if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+          const scoreRef = firebaseDb.ref('common/clickRaceScores');
+          await scoreRef.transaction(current => {
+            const serverScores = normalizeClickRaceScores(current);
+            serverScores.push(newEntry);
+            serverScores.sort((a, b) => b.clicks - a.clicks);
+            return {
+              resetAt: current && current.resetAt ? current.resetAt : 0,
+              items: serverScores.slice(0, 20)
+            };
+          });
+        } catch (e) {
+          console.error('Click race score save failed:', e);
+          showToast("광클 기록을 Firebase에 저장하지 못했습니다.", true);
+        }
+      })();
+
       showToast(`🎉 15초 동안 ${finalClicks}회 광클! 명예의 전당에 등록되었습니다.`);
     }
 
