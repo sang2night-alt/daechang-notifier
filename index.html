@@ -8,8 +8,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- MQTT over WebSocket for Cross-Device / School Firewall Bypass Realtime Sync -->
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <!-- Firebase: persistent realtime database + anonymous authentication -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
   <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -671,7 +673,23 @@
       timerInterval: null
     };
 
-    let mqttClient = null;
+    // Firebase connection (the visible UI/design is unchanged)
+    const firebaseConfig = {
+      apiKey: "AIzaSyA0G4G2PpGBRNVzoinxIwKjtN_3-6Ye-n0",
+      authDomain: "daechang-dashboard.firebaseapp.com",
+      databaseURL: "https://daechang-dashboard-default-rtdb.firebaseio.com",
+      projectId: "daechang-dashboard",
+      storageBucket: "daechang-dashboard.firebasestorage.app",
+      messagingSenderId: "966247047082",
+      appId: "1:966247047082:web:9dcfccf9d39342730fd5d3"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const firebaseAuth = firebase.auth();
+    const firebaseDb = firebase.database();
+    let firebaseReady = false;
+    let firebaseSyncGeneration = 0;
+    let firebaseActiveRefs = [];
+    const firebaseSessionStartedAt = Date.now();
     let clientId = 'daechang_' + Math.random().toString(16).substring(2, 10);
     let lastProcessedPacketId = null;
     let audioContext = null;
@@ -787,66 +805,132 @@
       }
     }
 
-    function initAutoSyncSystem() {
+    function detachFirebaseListeners() {
+      firebaseActiveRefs.forEach(item => {
+        try { item.ref.off(item.eventType, item.callback); } catch(e) {}
+      });
+      firebaseActiveRefs = [];
+    }
+
+    function trackFirebaseListener(ref, eventType, callback) {
+      ref.on(eventType, callback);
+      firebaseActiveRefs.push({ ref, eventType, callback });
+    }
+
+    async function initAutoSyncSystem() {
+      const myGeneration = ++firebaseSyncGeneration;
       const classKey = getClassKey();
-      const topicClass = `daechang_middle_school/class_${classKey}`;
-      const topicCommonMeal = `daechang_middle_school/common_meal`;
-      const topicCommonClickRace = `daechang_middle_school/common_clickrace`;
-      
       const indicatorLabel = document.getElementById('sync-channel-label');
       const indicatorDot = document.getElementById('sync-status-dot');
-      
-      if (indicatorLabel) indicatorLabel.innerText = `${state.className} 실시간 연결 중...`;
+
+      if (indicatorLabel) indicatorLabel.innerText = `${state.className} Firebase 연결 중...`;
       if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-amber-400 mr-1.5 animate-ping";
 
-      if (mqttClient) {
-        try { mqttClient.end(true); } catch(e) {}
-      }
-
-      const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+      detachFirebaseListeners();
 
       try {
-        mqttClient = mqtt.connect(brokerUrl, {
-          clientId: clientId,
-          keepalive: 30,
-          clean: true,
-          reconnectPeriod: 3000,
-          connectTimeout: 10000
-        });
+        if (!firebaseAuth.currentUser) {
+          await firebaseAuth.signInAnonymously();
+        }
+        if (myGeneration !== firebaseSyncGeneration) return;
+        firebaseReady = true;
 
-        mqttClient.on('connect', () => {
-          if (indicatorLabel) indicatorLabel.innerText = `${state.className} 실시간 연동 완료`;
-          if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse";
+        const classRef = firebaseDb.ref(`classes/${classKey}`);
+        const mealRef = firebaseDb.ref('common/mealMenu');
+        const scoreRef = firebaseDb.ref('common/clickRaceScores');
+        const eventRef = firebaseDb.ref(`events/${classKey}`);
 
-          mqttClient.subscribe([topicClass, topicCommonMeal, topicCommonClickRace], { qos: 1 }, (err) => {
-            if (!err) {
-              console.log(`Subscribed channels: ${topicClass}, ${topicCommonMeal}, ${topicCommonClickRace}`);
-            }
-          });
-        });
+        // First connection: Firebase wins if data already exists; otherwise seed it with this browser's local data.
+        const [classSnap, mealSnap, scoreSnap] = await Promise.all([
+          classRef.once('value'), mealRef.once('value'), scoreRef.once('value')
+        ]);
+        if (myGeneration !== firebaseSyncGeneration) return;
 
-        mqttClient.on('message', (t, message) => {
-          try {
-            const packet = JSON.parse(message.toString());
-            if (packet.senderId === clientId) return;
-            handleIncomingSyncPacket(packet);
-          } catch(err) {
-            console.error("Invalid packet:", err);
+        if (classSnap.exists()) {
+          const currentMeal = state.mealMenu;
+          const currentScores = state.clickRaceScores;
+          state = mergeStateWithDefaults(classSnap.val());
+          state.className = state.className || classSnap.val().className || defaultState.className;
+          state.mealMenu = currentMeal;
+          state.clickRaceScores = currentScores;
+          saveStateLocally(false);
+        } else {
+          await writeClassStateToFirebase();
+        }
+
+        if (mealSnap.exists()) {
+          state.mealMenu = mealSnap.val() || [];
+          localStorage.setItem('daechang_shared_meal', JSON.stringify(state.mealMenu));
+        } else {
+          await mealRef.set(state.mealMenu || []);
+        }
+
+        if (scoreSnap.exists()) {
+          state.clickRaceScores = scoreSnap.val() || [];
+          localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
+        } else {
+          await scoreRef.set(state.clickRaceScores || []);
+        }
+
+        renderAll();
+
+        const classCallback = snap => {
+          if (!snap.exists()) return;
+          const remote = snap.val();
+          const currentMeal = state.mealMenu;
+          const currentScores = state.clickRaceScores;
+          state = mergeStateWithDefaults(remote);
+          state.mealMenu = currentMeal;
+          state.clickRaceScores = currentScores;
+          saveStateLocally(false);
+          renderAll();
+        };
+        trackFirebaseListener(classRef, 'value', classCallback);
+
+        const mealCallback = snap => {
+          if (!snap.exists()) return;
+          state.mealMenu = snap.val() || [];
+          localStorage.setItem('daechang_shared_meal', JSON.stringify(state.mealMenu));
+          renderMealMenu();
+          renderMealEditor();
+        };
+        trackFirebaseListener(mealRef, 'value', mealCallback);
+
+        const scoreCallback = snap => {
+          if (!snap.exists()) return;
+          state.clickRaceScores = snap.val() || [];
+          localStorage.setItem('daechang_shared_clickrace', JSON.stringify(state.clickRaceScores));
+          renderClickRaceLeaderboard();
+        };
+        trackFirebaseListener(scoreRef, 'value', scoreCallback);
+
+        // Event channel is used only for transient calls/test signals. Old events are never replayed as new alerts.
+        const eventQuery = eventRef.orderByChild('_ts').startAt(firebaseSessionStartedAt);
+        const eventCallback = snap => {
+          const packet = snap.val();
+          if (!packet || packet.senderId === clientId) return;
+          handleIncomingSyncPacket(packet);
+        };
+        trackFirebaseListener(eventQuery, 'child_added', eventCallback);
+
+        const connectedRef = firebaseDb.ref('.info/connected');
+        const connectedCallback = snap => {
+          const connected = snap.val() === true;
+          if (connected) {
+            if (indicatorLabel) indicatorLabel.innerText = `${state.className} 실시간 연동 완료`;
+            if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse";
+          } else {
+            if (indicatorLabel) indicatorLabel.innerText = `${state.className} 오프라인 · 로컬 데이터 사용 중`;
+            if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-slate-400 mr-1.5";
           }
-        });
-
-        mqttClient.on('error', () => {
-          if (indicatorLabel) indicatorLabel.innerText = `${state.className} 재연결 중...`;
-          if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-rose-400 mr-1.5";
-        });
-
-        mqttClient.on('offline', () => {
-          if (indicatorLabel) indicatorLabel.innerText = `${state.className} 오프라인`;
-          if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-slate-400 mr-1.5";
-        });
-
+        };
+        trackFirebaseListener(connectedRef, 'value', connectedCallback);
       } catch(e) {
-        console.error("MQTT initialization failed:", e);
+        firebaseReady = false;
+        console.error('Firebase initialization failed:', e);
+        if (indicatorLabel) indicatorLabel.innerText = `${state.className} Firebase 연결 실패`;
+        if (indicatorDot) indicatorDot.className = "w-2 h-2 rounded-full bg-rose-400 mr-1.5";
+        showToast('Firebase 연결에 실패했습니다. 로컬 데이터로 계속 사용할 수 있습니다.', true);
       }
     }
 
@@ -897,22 +981,52 @@
       }
     }
 
-    function dispatchSyncData(packet, isCommonTopic = false, topicName = '') {
+    async function writeClassStateToFirebase() {
+      if (!firebaseAuth.currentUser) return;
       const classKey = getClassKey();
-      let topic = `daechang_middle_school/class_${classKey}`;
-      if (isCommonTopic) {
-        topic = topicName || `daechang_middle_school/common_meal`;
-      }
+      const classSpecificState = { ...state };
+      delete classSpecificState.mealMenu;
+      delete classSpecificState.clickRaceScores;
+      delete classSpecificState.isTeacherAuthenticated;
+      delete classSpecificState.idleTimer;
+      await firebaseDb.ref(`classes/${classKey}`).set(classSpecificState);
+    }
 
-      const payloadWithMeta = { 
-        ...packet, 
+    async function dispatchSyncData(packet, isCommonTopic = false, topicName = '') {
+      const payloadWithMeta = {
+        ...packet,
         senderId: clientId,
-        _ts: Date.now(), 
-        _id: Math.random().toString(36).substring(2, 11) 
+        _ts: firebase.database.ServerValue.TIMESTAMP,
+        _id: Math.random().toString(36).substring(2, 11)
       };
 
-      if (mqttClient && mqttClient.connected) {
-        mqttClient.publish(topic, JSON.stringify(payloadWithMeta), { qos: 1 });
+      try {
+        if (!firebaseAuth.currentUser) return;
+
+        if (packet.type === 'STATE_UPDATE') {
+          await writeClassStateToFirebase();
+          return;
+        }
+        if (packet.type === 'COMMON_MEAL_UPDATE') {
+          await firebaseDb.ref('common/mealMenu').set(packet.payload || []);
+          return;
+        }
+        if (packet.type === 'COMMON_CLICKRACE_UPDATE') {
+          await firebaseDb.ref('common/clickRaceScores').set(packet.payload || []);
+          return;
+        }
+        if (packet.type === 'MOOD_SUBMIT') {
+          // moodLogs is already persisted by saveStateLocally(); no duplicate event is needed.
+          return;
+        }
+
+        // CALL_SIGNAL / SYNC_TEST are transient realtime events.
+        const classKey = getClassKey();
+        const ref = firebaseDb.ref(`events/${classKey}`).push();
+        await ref.set(payloadWithMeta);
+        setTimeout(() => ref.remove().catch(() => {}), 120000);
+      } catch(e) {
+        console.error('Firebase write failed:', e);
       }
     }
 
@@ -1620,20 +1734,65 @@
       if (modal) modal.classList.remove('hidden');
     }
 
+    let startupClassSelectionTimer = null;
+    let startupClassCountdownTimer = null;
+
+    function clearStartupClassSelectionTimer() {
+      if (startupClassSelectionTimer) {
+        clearTimeout(startupClassSelectionTimer);
+        startupClassSelectionTimer = null;
+      }
+      if (startupClassCountdownTimer) {
+        clearInterval(startupClassCountdownTimer);
+        startupClassCountdownTimer = null;
+      }
+    }
+
     function closeClassSelectModal() {
       const modal = document.getElementById('class-select-modal');
       if (modal) modal.classList.add('hidden');
     }
 
-    function selectClass(newClassName) {
+    function startStartupClassReselection(savedClass) {
+      if (!savedClass) return;
+
+      openClassSelectModal();
+
+      const guideText = document.querySelector('#class-select-modal p.text-xs.text-slate-500.font-medium');
+      const originalGuide = guideText ? guideText.innerText : '';
+      let secondsLeft = 60;
+
+      const updateGuide = () => {
+        if (guideText) {
+          guideText.innerText = `마지막 사용 학급은 [${savedClass}]입니다. 다른 학급을 선택할 수 있으며, 선택하지 않으면 ${secondsLeft}초 후 [${savedClass}]으로 자동 선택됩니다.`;
+        }
+      };
+
+      updateGuide();
+      startupClassCountdownTimer = setInterval(() => {
+        secondsLeft -= 1;
+        updateGuide();
+      }, 1000);
+
+      startupClassSelectionTimer = setTimeout(() => {
+        clearStartupClassSelectionTimer();
+        if (guideText) guideText.innerText = originalGuide;
+        selectClass(savedClass, true);
+      }, 60000);
+    }
+
+    function selectClass(newClassName, isAutoSelection = false) {
       if (!newClassName) return;
+      clearStartupClassSelectionTimer();
       state.className = newClassName;
       localStorage.setItem('daechang_last_class', newClassName);
       loadStateLocally();
       initAutoSyncSystem();
       renderAll();
       closeClassSelectModal();
-      showToast(`교실이 [${newClassName}](으)로 변경되었습니다. 🏫`);
+      showToast(isAutoSelection
+        ? `마지막 사용 교실 [${newClassName}](으)로 자동 선택되었습니다. 🏫`
+        : `교실이 [${newClassName}](으)로 변경되었습니다. 🏫`);
     }
 
     function applyCustomClass() {
@@ -1718,6 +1877,8 @@
     }
 
     // INITIALIZATION ON LOAD
+    window.addEventListener('beforeunload', () => detachFirebaseListeners());
+
     window.addEventListener('DOMContentLoaded', () => {
       const savedClass = localStorage.getItem('daechang_last_class');
       if (savedClass) {
@@ -1726,10 +1887,17 @@
       loadStateLocally();
       restoreCardOrder();
       renderAll();
-      initAutoSyncSystem();
       initDragAndDrop();
       updateDateTime();
       setInterval(updateDateTime, 1000);
+
+      initAutoSyncSystem();
+
+      if (savedClass) {
+        startStartupClassReselection(savedClass);
+      } else {
+        openClassSelectModal();
+      }
     });
   </script>
 </body>
