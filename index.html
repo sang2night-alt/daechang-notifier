@@ -92,8 +92,8 @@
         <button id="tab-btn-mood" onclick="switchTab('mood')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
           <i class="fa-solid fa-face-smile mr-1.5"></i> 오늘의 기분
         </button>
-        <button id="tab-btn-clickrace" onclick="switchTab('clickrace')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
-          <i class="fa-solid fa-bolt mr-1.5 text-yellow-300"></i> 광클 레이스
+        <button id="tab-btn-gamecenter" onclick="switchTab('gamecenter')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
+          <i class="fa-solid fa-gamepad mr-1.5 text-yellow-300"></i> 게임센터
         </button>
         <button id="tab-btn-teacher" onclick="switchTab('teacher')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-yellow-300 hover:bg-indigo-700/80 transition flex items-center">
           <i id="teacher-tab-icon" class="fa-solid fa-lock mr-1.5"></i>
@@ -318,8 +318,13 @@
       </div>
     </section>
 
-    <!-- VIEW 3.5: 15초 스피드 광클레이스 VIEW -->
-    <section id="view-clickrace" class="hidden space-y-6">
+    <!-- VIEW 3.5: GAME CENTER -->
+    <section id="view-gamecenter" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl p-2 shadow-sm border border-slate-200 flex flex-wrap gap-2">
+        <button id="game-sub-btn-clickrace" onclick="switchGameCenter('clickrace')" class="flex-1 min-w-[150px] bg-amber-500 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-bolt mr-2"></i>광클 레이스</button>
+        <button id="game-sub-btn-reaction" onclick="switchGameCenter('reaction')" class="flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-stopwatch mr-2"></i>반응속도 배틀</button>
+      </div>
+      <section id="game-view-clickrace" class="space-y-6">
       <div class="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white rounded-3xl p-6 shadow-md flex flex-wrap justify-between items-center gap-4">
         <div>
           <h2 class="text-xl sm:text-2xl font-black flex items-center">
@@ -373,30 +378,81 @@
           </div>
         </div>
 
-        <div class="lg:col-span-7 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
-          <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 class="text-base font-extrabold text-slate-800 flex items-center">
-              <i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> 전학급 실시간 광클 명예의 전당 TOP 10
-            </h3>
-            <span class="text-[11px] bg-yellow-100 text-yellow-800 font-extrabold px-2.5 py-1 rounded-lg">전교 공통 랭킹</span>
-          </div>
+        
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs sm:text-sm">
-              <thead>
-                <tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
-                  <th class="p-3 rounded-l-xl text-center w-14">순위</th>
-                  <th class="p-3">학급</th>
-                  <th class="p-3">이름</th>
-                  <th class="p-3 text-right">최고 기록</th>
-                  <th class="p-3 rounded-r-xl text-center">날짜</th>
-                </tr>
-              </thead>
-              <tbody id="clickrace-leaderboard-body" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
-            </table>
+      </div>
+    </section>
+
+      <!-- GAME: REALTIME REACTION SPEED BATTLE -->
+      <section id="game-view-reaction" class="hidden space-y-6">
+      <div class="bg-gradient-to-r from-cyan-600 to-indigo-700 text-white rounded-3xl p-6 shadow-md flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-black flex items-center">
+            <i class="fa-solid fa-stopwatch mr-3 text-cyan-200"></i> 실시간 반응속도 배틀
+          </h2>
+          <p class="text-xs sm:text-sm text-cyan-100 mt-1">학급 대 학급으로 도전장을 보내고, 먼저 수락한 학급과 바로 연결해 반응속도를 겨룹니다.</p>
+        </div>
+        <span class="bg-white/20 backdrop-blur text-white text-xs px-3.5 py-1.5 rounded-full font-bold border border-white/30">
+          <i class="fa-solid fa-wifi mr-1.5"></i> Firebase 실시간 학급 대전
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-5 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
+          <h3 class="text-base font-extrabold text-slate-800 border-b border-slate-100 pb-3 flex items-center">
+            <i class="fa-solid fa-users text-cyan-600 mr-2"></i> 학급 대전 연결
+          </h3>
+          <div class="bg-cyan-50 border border-cyan-200 rounded-2xl p-4 flex items-center justify-between">
+            <span class="text-xs font-bold text-cyan-700">우리 학급</span>
+            <span id="reaction-my-class" class="text-lg font-black text-cyan-800">-</span>
+          </div>
+          <button id="reaction-create-btn" onclick="createReactionRoom()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold py-3 rounded-xl text-sm transition">⚔️ 다른 학급에 도전장 보내기</button>
+          <p class="text-[11px] text-slate-400 font-medium text-center">도전장을 보내면 다른 학급 태블릿에 즉시 알림이 표시됩니다.</p>
+
+          <div id="reaction-room-panel" class="hidden space-y-3 pt-2 border-t border-slate-100">
+            <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-2xl p-3">
+              <span class="text-xs font-bold text-slate-500">현재 대전</span>
+              <span id="reaction-current-room" class="text-sm font-black text-indigo-700">상대 연결 중</span>
+            </div>
+            <div id="reaction-player-list" class="space-y-2"></div>
+            <button id="reaction-ready-btn" onclick="toggleReactionReady()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl text-sm transition">✅ 준비 완료</button>
+            <button onclick="leaveReactionRoom()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-xs transition">대전 취소 / 나가기</button>
           </div>
         </div>
 
+        <div class="lg:col-span-7 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between space-y-5">
+          <div>
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 class="text-base font-extrabold text-slate-800 flex items-center"><i class="fa-solid fa-bolt text-amber-500 mr-2"></i> 반응 테스트</h3>
+              <span id="reaction-status-badge" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-bold">도전 대기</span>
+            </div>
+            <div id="reaction-message" class="text-center py-5 text-sm font-extrabold text-slate-500">도전장을 보내거나 다른 학급의 도전을 기다리세요.</div>
+            <button id="reaction-hit-btn" onclick="hitReactionButton()" disabled class="w-full h-48 sm:h-56 rounded-3xl bg-slate-200 text-slate-500 font-black text-3xl sm:text-4xl shadow-inner border-4 border-slate-300 transition-all select-none disabled:cursor-not-allowed">대기 중</button>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-cyan-50 border border-cyan-200 rounded-2xl p-4 text-center">
+              <span class="block text-xs font-extrabold text-cyan-700 mb-1">우리 반 기록</span>
+              <span id="reaction-my-result" class="text-2xl font-black text-cyan-700">-</span>
+            </div>
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-center">
+              <span class="block text-xs font-extrabold text-indigo-700 mb-1">상대 반 기록</span>
+              <span id="reaction-opponent-result" class="text-2xl font-black text-indigo-700">-</span>
+            </div>
+          </div>
+          <div class="text-center text-[11px] text-slate-400 font-medium">두 학급 모두 준비 완료 후 신호가 나올 때까지 기다리세요. 먼저 누르면 부정 출발입니다.</div>
+        </div>
+      </div>
+    </section>
+
+      <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4 mt-6">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+          <h3 class="text-base font-extrabold text-slate-800 flex items-center"><i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> 반응속도 명예의 전당 TOP 5</h3>
+          <span class="text-[11px] bg-cyan-100 text-cyan-800 font-extrabold px-2.5 py-1 rounded-lg">학급별 최고 기록</span>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left text-xs sm:text-sm">
+          <thead><tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200"><th class="p-3 text-center w-14">순위</th><th class="p-3">학급</th><th class="p-3 text-right">최고 기록</th><th class="p-3 text-center">날짜</th></tr></thead>
+          <tbody id="reaction-leaderboard-body" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
+        </table></div>
       </div>
     </section>
 
@@ -621,6 +677,24 @@
     </div>
   </div>
 
+  <!-- MODAL: REACTION BATTLE CHALLENGE -->
+  <div id="reaction-challenge-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-cyan-500 space-y-4">
+      <div class="w-16 h-16 bg-cyan-100 text-cyan-600 rounded-full flex items-center justify-center mx-auto text-3xl">
+        <i class="fa-solid fa-stopwatch"></i>
+      </div>
+      <div>
+        <div class="text-xs font-black text-cyan-600 uppercase tracking-wider mb-1">반응속도 배틀 도전장</div>
+        <h3 id="reaction-challenge-title" class="text-2xl font-black text-slate-800">다른 학급의 도전!</h3>
+        <p id="reaction-challenge-text" class="text-sm font-bold text-slate-500 mt-2">도전장을 수락하시겠습니까?</p>
+      </div>
+      <div class="flex space-x-2">
+        <button onclick="dismissReactionChallenge()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm">나중에</button>
+        <button id="reaction-challenge-accept-btn" onclick="acceptReactionChallenge()" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold py-3 rounded-xl text-sm">⚡ 도전 수락</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL 3: TEACHER PIN AUTHORIZATION -->
   <div id="pin-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
     <div class="bg-white rounded-3xl p-6 max-w-xs w-full text-center shadow-xl border border-slate-100 space-y-4">
@@ -679,7 +753,8 @@
         { className: "1학년 3반", name: "홍길동", clicks: 135, date: "09-23" },
         { className: "2학년 1반", name: "김빛나", clicks: 122, date: "09-23" },
         { className: "3학년 2반", name: "이철수", clicks: 110, date: "09-23" }
-      ]
+      ],
+      reactionScores: []
     };
 
     let state = JSON.parse(JSON.stringify(defaultState));
@@ -767,6 +842,7 @@
         const classSpecificState = { ...state };
         delete classSpecificState.mealMenu;
         delete classSpecificState.clickRaceScores;
+        delete classSpecificState.reactionScores;
         delete classSpecificState.selectedTimetableDay;
         delete classSpecificState.pin;
         localStorage.setItem(`daechang_state_${classKey}`, JSON.stringify(classSpecificState));
@@ -882,21 +958,24 @@
         }
         if (myGeneration !== firebaseSyncGeneration) return;
         firebaseReady = true;
+        initReactionChallengeListener();
 
         const classRef = firebaseDb.ref(`classes/${classKey}`);
         const mealRef = firebaseDb.ref('common/mealMenu');
         const scoreRef = firebaseDb.ref('common/clickRaceScores');
+        const reactionScoreRef = firebaseDb.ref('common/reactionScores');
         const eventRef = firebaseDb.ref(`events/${classKey}`);
 
         // First connection: Firebase wins if data already exists; otherwise seed it with this browser's local data.
-        const [classSnap, mealSnap, scoreSnap] = await Promise.all([
-          classRef.once('value'), mealRef.once('value'), scoreRef.once('value')
+        const [classSnap, mealSnap, scoreSnap, reactionScoreSnap] = await Promise.all([
+          classRef.once('value'), mealRef.once('value'), scoreRef.once('value'), reactionScoreRef.once('value')
         ]);
         if (myGeneration !== firebaseSyncGeneration) return;
 
         if (classSnap.exists()) {
           const currentMeal = state.mealMenu;
           const currentScores = state.clickRaceScores;
+          const currentReactionScores = state.reactionScores || [];
           const localUiState = {
             className: state.className,
             pin: state.pin,
@@ -908,6 +987,7 @@
           state = mergeStateWithDefaults({ ...state, ...classSnap.val(), ...localUiState, selectedTimetableDay: null });
           state.mealMenu = currentMeal;
           state.clickRaceScores = currentScores;
+          state.reactionScores = currentReactionScores;
           saveStateLocally(false);
         } else {
           await writeClassStateToFirebase();
@@ -931,6 +1011,8 @@
           await scoreRef.set({ resetAt: firebase.database.ServerValue.TIMESTAMP });
         }
 
+        state.reactionScores = reactionScoreSnap.exists() ? normalizeReactionScores(reactionScoreSnap.val()) : [];
+
         renderAll();
 
         const classCallback = snap => {
@@ -938,6 +1020,7 @@
           const remote = snap.val() || {};
           const currentMeal = state.mealMenu;
           const currentScores = state.clickRaceScores;
+          const currentReactionScores = state.reactionScores || [];
           const localUiState = {
             className: state.className,
             pin: state.pin,
@@ -949,6 +1032,7 @@
           state = mergeStateWithDefaults({ ...state, ...remote, ...localUiState, selectedTimetableDay: null });
           state.mealMenu = currentMeal;
           state.clickRaceScores = currentScores;
+          state.reactionScores = currentReactionScores;
           saveStateLocally(false);
           renderAll();
         };
@@ -970,6 +1054,12 @@
           renderClickRaceLeaderboard();
         };
         trackFirebaseListener(scoreRef, 'value', scoreCallback);
+
+        const reactionScoreCallback = snap => {
+          state.reactionScores = snap.exists() ? normalizeReactionScores(snap.val()) : [];
+          renderReactionLeaderboard();
+        };
+        trackFirebaseListener(reactionScoreRef, 'value', reactionScoreCallback);
 
         // Event channel is used only for transient calls/test signals. Old events are never replayed as new alerts.
         const eventQuery = eventRef.orderByChild('_ts').startAt(firebaseSessionStartedAt);
@@ -1015,6 +1105,7 @@
           state = mergeStateWithDefaults(packet.payload);
           state.mealMenu = currentMeal;
           state.clickRaceScores = currentScores;
+          state.reactionScores = currentReactionScores;
           saveStateLocally(false);
           renderAll();
         }
@@ -1208,7 +1299,7 @@
 
       state.currentTab = tab;
       
-      ['notifier', 'clock', 'meal', 'mood', 'clickrace', 'teacher'].forEach(t => {
+      ['notifier', 'clock', 'meal', 'mood', 'gamecenter', 'teacher'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (view) view.classList.add('hidden');
 
@@ -1235,6 +1326,17 @@
       }
 
       resetIdleTimer();
+    }
+
+    function switchGameCenter(game) {
+      ['clickrace', 'reaction'].forEach(g => {
+        const view = document.getElementById(`game-view-${g}`);
+        if (view) view.classList.toggle('hidden', g !== game);
+        const btn = document.getElementById(`game-sub-btn-${g}`);
+        if (!btn) return;
+        if (g === game) btn.className = g === 'clickrace' ? 'flex-1 min-w-[150px] bg-amber-500 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition' : 'flex-1 min-w-[150px] bg-cyan-600 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition';
+        else btn.className = 'flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition';
+      });
     }
 
     function lockTeacherMode() {
@@ -1503,6 +1605,194 @@
       showToast("학급 기분 기록이 초기화되었습니다.");
     }
 
+
+    // REALTIME REACTION SPEED BATTLE - CLASS VS CLASS CHALLENGE
+    let reactionRoomCode = null;
+    let reactionPlayerSlot = null;
+    let reactionRoomRef = null;
+    let reactionRoomCallback = null;
+    let reactionServerOffset = 0;
+    let reactionGoTimer = null;
+    let reactionTimeoutTimer = null;
+    let reactionLastRoom = null;
+    let pendingReactionChallenge = null;
+    let reactionChallengeRef = null;
+    let reactionChallengeCallback = null;
+
+    firebaseDb.ref('.info/serverTimeOffset').on('value', snap => {
+      reactionServerOffset = Number(snap.val()) || 0;
+    });
+
+    function reactionServerNow() { return Date.now() + reactionServerOffset; }
+
+    function setReactionStatus(text, tone = 'slate') {
+      const badge = document.getElementById('reaction-status-badge');
+      if (!badge) return;
+      const tones = { slate:'bg-slate-100 text-slate-600', amber:'bg-amber-100 text-amber-700', emerald:'bg-emerald-100 text-emerald-700', rose:'bg-rose-100 text-rose-700', indigo:'bg-indigo-100 text-indigo-700' };
+      badge.className = `text-xs px-2.5 py-1 rounded-lg font-bold ${tones[tone] || tones.slate}`;
+      badge.innerText = text;
+    }
+
+    function clearReactionTimers() {
+      if (reactionGoTimer) clearTimeout(reactionGoTimer);
+      if (reactionTimeoutTimer) clearTimeout(reactionTimeoutTimer);
+      reactionGoTimer = null; reactionTimeoutTimer = null;
+    }
+
+    async function ensureReactionAuth() {
+      if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+      return firebaseAuth.currentUser;
+    }
+
+    function initReactionChallengeListener() {
+      if (reactionChallengeRef && reactionChallengeCallback) reactionChallengeRef.off('value', reactionChallengeCallback);
+      reactionChallengeRef = firebaseDb.ref('reactionChallenge');
+      reactionChallengeCallback = snap => {
+        const challenge = snap.val();
+        if (!challenge || challenge.status !== 'open') { hideReactionChallengeModal(); return; }
+        const age = reactionServerNow() - Number(challenge.createdAt || 0);
+        if (age > 60000 || challenge.senderId === clientId || challenge.fromClass === state.className || reactionRoomCode) return;
+        pendingReactionChallenge = challenge;
+        const title = document.getElementById('reaction-challenge-title');
+        const text = document.getElementById('reaction-challenge-text');
+        if (title) title.innerText = `${challenge.fromClass}의 도전!`;
+        if (text) text.innerText = `${challenge.fromClass}에서 반응속도 배틀 도전장을 보냈습니다. 수락하면 자동으로 연결됩니다.`;
+        const modal = document.getElementById('reaction-challenge-modal');
+        if (modal) modal.classList.remove('hidden');
+      };
+      reactionChallengeRef.on('value', reactionChallengeCallback);
+    }
+
+    function hideReactionChallengeModal() {
+      const modal = document.getElementById('reaction-challenge-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function dismissReactionChallenge() {
+      hideReactionChallengeModal();
+      pendingReactionChallenge = null;
+    }
+
+    async function createReactionRoom() {
+      if (reactionRoomCode) return showToast('이미 대전방에 연결되어 있습니다.', true);
+      try {
+        const user = await ensureReactionAuth();
+        const roomId = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+        const roomRef = firebaseDb.ref(`reactionRooms/${roomId}`);
+        await roomRef.set({
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          status: 'waiting', round: 1,
+          players: { p1: { uid:user.uid, className:state.className, ready:false, result:null } }
+        });
+        await enterReactionRoom(roomId, 'p1');
+        await firebaseDb.ref('reactionChallenge').set({
+          roomId, fromClass:state.className, senderId:clientId, status:'open', createdAt:firebase.database.ServerValue.TIMESTAMP
+        });
+        showToast(`⚔️ ${state.className}의 도전장을 모든 학급에 보냈습니다!`);
+      } catch(e) {
+        console.error('Reaction challenge create failed:', e);
+        showToast('도전장 발송 중 오류가 발생했습니다.', true);
+      }
+    }
+
+    async function acceptReactionChallenge() {
+      const challenge = pendingReactionChallenge;
+      if (!challenge || !challenge.roomId) return hideReactionChallengeModal();
+      const btn = document.getElementById('reaction-challenge-accept-btn');
+      if (btn) btn.disabled = true;
+      try {
+        const user = await ensureReactionAuth();
+        const roomRef = firebaseDb.ref(`reactionRooms/${challenge.roomId}`);
+        let joined = false;
+        const result = await roomRef.transaction(room => {
+          if (!room || room.status !== 'waiting' || !room.players || !room.players.p1 || room.players.p2) return;
+          if (room.players.p1.className === state.className) return;
+          room.players.p2 = { uid:user.uid, className:state.className, ready:false, result:null };
+          joined = true;
+          return room;
+        });
+        if (!result.committed || !joined) {
+          showToast('다른 학급이 먼저 도전장을 수락했습니다.', true);
+          hideReactionChallengeModal(); pendingReactionChallenge = null; return;
+        }
+        await firebaseDb.ref('reactionChallenge').transaction(c => {
+          if (!c || c.roomId !== challenge.roomId || c.status !== 'open') return c;
+          c.status='accepted'; c.acceptedBy=state.className; c.acceptedAt=firebase.database.ServerValue.TIMESTAMP; return c;
+        });
+        hideReactionChallengeModal(); pendingReactionChallenge = null;
+        switchTab('gamecenter');
+        switchGameCenter('reaction');
+        await enterReactionRoom(challenge.roomId, 'p2');
+        showToast(`⚡ ${challenge.fromClass}의 도전을 수락했습니다!`);
+      } catch(e) {
+        console.error('Reaction challenge accept failed:', e);
+        showToast('도전 수락 중 오류가 발생했습니다.', true);
+      } finally { if (btn) btn.disabled = false; }
+    }
+
+    async function enterReactionRoom(code, slot) {
+      await leaveReactionRoom(false, false);
+      reactionRoomCode=code; reactionPlayerSlot=slot; reactionRoomRef=firebaseDb.ref(`reactionRooms/${code}`);
+      const panel=document.getElementById('reaction-room-panel'); if(panel) panel.classList.remove('hidden');
+      const roomLabel=document.getElementById('reaction-current-room'); if(roomLabel) roomLabel.innerText='상대 연결 중';
+      reactionRoomCallback=snap=>handleReactionRoomUpdate(snap.val()); reactionRoomRef.on('value',reactionRoomCallback);
+    }
+
+    async function leaveReactionRoom(showMessage=true, cancelChallenge=true) {
+      const oldCode=reactionRoomCode; const oldSlot=reactionPlayerSlot;
+      clearReactionTimers();
+      if(reactionRoomRef && reactionRoomCallback) reactionRoomRef.off('value',reactionRoomCallback);
+      reactionRoomCallback=null; reactionRoomRef=null; reactionRoomCode=null; reactionPlayerSlot=null; reactionLastRoom=null;
+      if(cancelChallenge && oldCode && oldSlot==='p1') {
+        try {
+          await firebaseDb.ref('reactionChallenge').transaction(c => c && c.roomId===oldCode && c.status==='open' ? null : c);
+          await firebaseDb.ref(`reactionRooms/${oldCode}`).transaction(room => room && room.status==='waiting' && !(room.players&&room.players.p2) ? null : room);
+        } catch(e) {}
+      }
+      const panel=document.getElementById('reaction-room-panel'); if(panel) panel.classList.add('hidden');
+      const hit=document.getElementById('reaction-hit-btn'); if(hit){hit.disabled=true;hit.innerText='대기 중';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-slate-200 text-slate-500 font-black text-3xl sm:text-4xl shadow-inner border-4 border-slate-300 transition-all select-none disabled:cursor-not-allowed';}
+      const msg=document.getElementById('reaction-message'); if(msg) msg.innerText='도전장을 보내거나 다른 학급의 도전을 기다리세요.';
+      const mine=document.getElementById('reaction-my-result'),opp=document.getElementById('reaction-opponent-result'); if(mine)mine.innerText='-';if(opp)opp.innerText='-';
+      setReactionStatus('도전 대기'); if(showMessage)showToast('대전에서 나왔습니다.');
+    }
+
+    async function toggleReactionReady(){if(!reactionRoomRef||!reactionPlayerSlot)return;const r=reactionRoomRef.child(`players/${reactionPlayerSlot}/ready`);const s=await r.once('value');await r.set(!s.val());}
+
+    async function tryStartReactionRound(room){
+      if(!reactionRoomRef||!room||room.status!=='waiting')return;const p1=room.players&&room.players.p1,p2=room.players&&room.players.p2;if(!p1||!p2||!p1.ready||!p2.ready)return;
+      const proposedStart=Math.round(reactionServerNow()+3000+Math.random()*2500);
+      await reactionRoomRef.transaction(current=>{if(!current||current.status!=='waiting')return;const a=current.players&&current.players.p1,b=current.players&&current.players.p2;if(!a||!b||!a.ready||!b.ready)return;current.status='countdown';current.startAt=proposedStart;current.players.p1.result=null;current.players.p2.result=null;return current;});
+    }
+
+    function formatReactionResult(result){if(!result)return'-';if(result.falseStart)return'부정 출발';if(result.timeout)return'시간 초과';if(typeof result.ms==='number')return`${Math.max(0,Math.round(result.ms))} ms`;return'-';}
+
+    function handleReactionRoomUpdate(room){
+      if(!room||!reactionPlayerSlot){if(reactionRoomCode){showToast('대전이 종료되었습니다.',true);leaveReactionRoom(false,false);}return;}
+      reactionLastRoom=room;const players=room.players||{},me=players[reactionPlayerSlot],otherSlot=reactionPlayerSlot==='p1'?'p2':'p1',opponent=players[otherSlot];
+      const roomLabel=document.getElementById('reaction-current-room');if(roomLabel)roomLabel.innerText=opponent?`${me.className} VS ${opponent.className}`:'도전 수락 대기 중';
+      const list=document.getElementById('reaction-player-list');if(list){const row=(p,label)=>`<div class="flex items-center justify-between p-3 rounded-xl border ${p?'bg-white border-slate-200':'bg-slate-50 border-dashed border-slate-300'}"><span class="text-xs font-extrabold text-slate-500">${label}</span><span class="text-sm font-black text-slate-800">${p?(p.className||''):'상대 학급 기다리는 중...'}</span><span class="text-xs font-bold ${p&&p.ready?'text-emerald-600':'text-slate-400'}">${p&&p.ready?'준비완료':'대기'}</span></div>`;list.innerHTML=row(players.p1,'도전자')+row(players.p2,'수락 학급');}
+      const readyBtn=document.getElementById('reaction-ready-btn');if(readyBtn&&me){readyBtn.disabled=room.status!=='waiting'||!opponent;readyBtn.innerText=me.ready?'↩️ 준비 취소':'✅ 준비 완료';readyBtn.className=me.ready?'w-full bg-slate-600 hover:bg-slate-700 text-white font-extrabold py-3 rounded-xl text-sm transition disabled:opacity-50':'w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl text-sm transition disabled:opacity-50';}
+      const mine=document.getElementById('reaction-my-result'),opp=document.getElementById('reaction-opponent-result');if(mine)mine.innerText=formatReactionResult(me&&me.result);if(opp)opp.innerText=formatReactionResult(opponent&&opponent.result);
+      if(room.status==='waiting'){clearReactionTimers();const hit=document.getElementById('reaction-hit-btn');if(hit){hit.disabled=true;hit.innerText='준비 대기';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-slate-200 text-slate-500 font-black text-3xl sm:text-4xl shadow-inner border-4 border-slate-300 transition-all select-none disabled:cursor-not-allowed';}const msg=document.getElementById('reaction-message');if(msg)msg.innerText=opponent?'두 학급 모두 준비 완료를 눌러주세요.':'다른 학급이 도전장을 수락하기를 기다리는 중입니다.';setReactionStatus(opponent?'준비 확인 중':'도전 수락 대기',opponent?'amber':'slate');tryStartReactionRound(room);return;}
+      if(room.status==='countdown'&&room.startAt){scheduleReactionGo(room.startAt,me);return;}if(room.status==='finished')showReactionFinished(room,me,opponent);
+    }
+
+    function scheduleReactionGo(startAt,me){
+      clearReactionTimers();const hit=document.getElementById('reaction-hit-btn'),msg=document.getElementById('reaction-message');if(!hit)return;hit.disabled=!!(me&&me.result);hit.innerText='기다리세요...';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-rose-500 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-rose-300 transition-all select-none active:scale-[0.99]';if(msg)msg.innerText='아직 누르지 마세요. GO! 신호를 기다리세요.';setReactionStatus('신호 대기','rose');const delay=Math.max(0,startAt-reactionServerNow());reactionGoTimer=setTimeout(()=>{if(!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const currentMe=reactionLastRoom.players&&reactionLastRoom.players[reactionPlayerSlot];if(currentMe&&currentMe.result)return;hit.disabled=false;hit.innerText='GO!';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-4xl sm:text-5xl shadow-xl border-4 border-emerald-300 transition-all select-none active:scale-95';if(msg)msg.innerText='지금 누르세요!';setReactionStatus('GO!','emerald');},delay);reactionTimeoutTimer=setTimeout(()=>autoReactionTimeout(),delay+5000);
+    }
+
+    async function hitReactionButton(){if(!reactionRoomRef||!reactionPlayerSlot||!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const startAt=Number(reactionLastRoom.startAt||0),now=reactionServerNow(),resultRef=reactionRoomRef.child(`players/${reactionPlayerSlot}/result`),payload=now<startAt?{falseStart:true,at:firebase.database.ServerValue.TIMESTAMP}:{ms:Math.max(0,Math.round(now-startAt)),at:firebase.database.ServerValue.TIMESTAMP};const tx=await resultRef.transaction(current=>current?undefined:payload);if(tx.committed){const hit=document.getElementById('reaction-hit-btn');if(hit)hit.disabled=true;await finalizeReactionRoomIfPossible();}}
+    async function autoReactionTimeout(){if(!reactionRoomRef||!reactionPlayerSlot||!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const r=reactionRoomRef.child(`players/${reactionPlayerSlot}/result`);await r.transaction(current=>current?undefined:({timeout:true,at:firebase.database.ServerValue.TIMESTAMP}));await finalizeReactionRoomIfPossible();}
+    async function finalizeReactionRoomIfPossible(){if(!reactionRoomRef)return;await reactionRoomRef.transaction(room=>{if(!room||room.status!=='countdown'||!room.players||!room.players.p1||!room.players.p2)return;const r1=room.players.p1.result,r2=room.players.p2.result;if(!r1||!r2)return;room.status='finished';room.finishedAt=firebase.database.ServerValue.TIMESTAMP;return room;});}
+
+    function showReactionFinished(room,me,opponent){
+      clearReactionTimers();const hit=document.getElementById('reaction-hit-btn');if(hit){hit.disabled=true;hit.innerText='대전 종료';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-slate-700 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-slate-500 transition-all select-none disabled:cursor-not-allowed';}
+      const msg=document.getElementById('reaction-message');let text='대전이 종료되었습니다.';const myResult=me&&me.result,opResult=opponent&&opponent.result,myBad=myResult&&(myResult.falseStart||myResult.timeout),opBad=opResult&&(opResult.falseStart||opResult.timeout);
+      if(myBad&&!opBad)text=`😢 ${me.className} 패배! 부정 출발 또는 시간 초과입니다.`;else if(!myBad&&opBad)text=`🏆 ${me.className} 승리! 상대 학급이 기록에 실패했습니다.`;else if(myBad&&opBad)text='🤝 두 학급 모두 기록 실패입니다.';else if(myResult&&opResult&&typeof myResult.ms==='number'&&typeof opResult.ms==='number'){if(myResult.ms<opResult.ms)text=`🏆 ${me.className} 승리! ${Math.round(opResult.ms-myResult.ms)}ms 더 빨랐습니다.`;else if(myResult.ms>opResult.ms)text=`😢 ${opponent.className} 승리! ${Math.round(myResult.ms-opResult.ms)}ms 더 빨랐습니다.`;else text='🤝 무승부! 두 학급의 기록이 같습니다.';}
+      if(msg)msg.innerText=text+' 대전 취소 / 나가기를 누르면 새 도전을 시작할 수 있습니다.';setReactionStatus('대전 종료','indigo');const readyBtn=document.getElementById('reaction-ready-btn');if(readyBtn)readyBtn.disabled=true;
+      if(myResult&&typeof myResult.ms==='number') saveReactionClassBest(me.className,myResult).catch(e=>console.error('Reaction leaderboard save failed:',e));
+    }
+
     // RENDER ALL VIEWS
     function renderAll() {
       const classLabel = document.getElementById('current-class-label');
@@ -1510,6 +1800,9 @@
 
       const moodClassName = document.getElementById('mood-board-class-name');
       if (moodClassName) moodClassName.innerText = state.className;
+
+      const reactionMyClass = document.getElementById('reaction-my-class');
+      if (reactionMyClass) reactionMyClass.innerText = state.className;
 
       const teacherBadge = document.getElementById('teacher-current-class-badge');
       if (teacherBadge) teacherBadge.innerText = `${state.className} 관리 중`;
@@ -1526,6 +1819,7 @@
       renderPraise();
       renderMoodLogTable();
       renderClickRaceLeaderboard();
+      renderReactionLeaderboard();
       loadDayTimetableEditor();
       renderMealEditor();
       renderTodoEditor();
