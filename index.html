@@ -480,6 +480,8 @@
       
     </section>
 
+    </section>
+
     <!-- VIEW 4: TEACHER DASHBOARD -->
     <section id="view-teacher" class="hidden space-y-6">
       <div class="bg-slate-800 text-white p-5 rounded-3xl shadow-md flex flex-wrap justify-between items-center gap-3">
@@ -1875,9 +1877,21 @@
     async function toggleReactionReady(){if(!reactionRoomRef||!reactionPlayerSlot)return;const r=reactionRoomRef.child(`players/${reactionPlayerSlot}/ready`);const s=await r.once('value');await r.set(!s.val());}
 
     async function tryStartReactionRound(room){
-      if(!reactionRoomRef||!room||room.status!=='waiting')return;const p1=room.players&&room.players.p1,p2=room.players&&room.players.p2;if(!p1||!p2||!p1.ready||!p2.ready)return;
+      if(!reactionRoomRef||!room||room.status!=='waiting')return;
+      const p1=room.players&&room.players.p1,p2=room.players&&room.players.p2;
+      if(!p1||!p2||!p1.ready||!p2.ready)return;
       const proposedStart=Math.round(reactionServerNow()+3000+Math.random()*2500);
-      await reactionRoomRef.transaction(current=>{if(!current||current.status!=='waiting')return;const a=current.players&&current.players.p1,b=current.players&&current.players.p2;if(!a||!b||!a.ready||!b.ready)return;current.status='countdown';current.startAt=proposedStart;current.players.p1.result=null;current.players.p2.result=null;return current;});
+      await reactionRoomRef.transaction(current=>{
+        if(!current||current.status!=='waiting')return;
+        const a=current.players&&current.players.p1,b=current.players&&current.players.p2;
+        if(!a||!b||!a.ready||!b.ready)return;
+        current.round=Math.min(3,Math.max(1,Number(current.round||1)));
+        current.status='countdown';
+        current.startAt=proposedStart;
+        current.players.p1.result=null;
+        current.players.p2.result=null;
+        return current;
+      });
     }
 
     function formatReactionResult(result){if(!result)return'-';if(result.falseStart)return'부정 출발';if(result.timeout)return'시간 초과';if(typeof result.ms==='number')return`${Math.max(0,Math.round(result.ms))} ms`;return'-';}
@@ -1889,24 +1903,109 @@
       const list=document.getElementById('reaction-player-list');if(list){const row=(p,label)=>`<div class="flex items-center justify-between p-3 rounded-xl border ${p?'bg-white border-slate-200':'bg-slate-50 border-dashed border-slate-300'}"><span class="text-xs font-extrabold text-slate-500">${label}</span><span class="text-sm font-black text-slate-800">${p?(p.className||''):'상대 학급 기다리는 중...'}</span><span class="text-xs font-bold ${p&&p.ready?'text-emerald-600':'text-slate-400'}">${p&&p.ready?'준비완료':'대기'}</span></div>`;list.innerHTML=row(players.p1,'도전자')+row(players.p2,'수락 학급');}
       const readyBtn=document.getElementById('reaction-ready-btn');if(readyBtn&&me){readyBtn.disabled=room.status!=='waiting'||!opponent;readyBtn.innerText=me.ready?'↩️ 준비 취소':'✅ 준비 완료';readyBtn.className=me.ready?'w-full bg-slate-600 hover:bg-slate-700 text-white font-extrabold py-3 rounded-xl text-sm transition disabled:opacity-50':'w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl text-sm transition disabled:opacity-50';}
       const mine=document.getElementById('reaction-my-result'),opp=document.getElementById('reaction-opponent-result');if(mine)mine.innerText=formatReactionResult(me&&me.result);if(opp)opp.innerText=formatReactionResult(opponent&&opponent.result);
-      if(room.status==='waiting'){clearReactionTimers();const hit=document.getElementById('reaction-hit-btn');if(hit){hit.disabled=true;hit.innerText='준비 대기';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-slate-200 text-slate-500 font-black text-3xl sm:text-4xl shadow-inner border-4 border-slate-300 transition-all select-none disabled:cursor-not-allowed';}const msg=document.getElementById('reaction-message');if(msg)msg.innerText=opponent?'두 학급 모두 준비 완료를 눌러주세요.':'다른 학급이 도전장을 수락하기를 기다리는 중입니다.';setReactionStatus(opponent?'준비 확인 중':'도전 수락 대기',opponent?'amber':'slate');tryStartReactionRound(room);return;}
+      if(room.status==='waiting'){clearReactionTimers();const round=Math.min(3,Math.max(1,Number(room.round||1)));const hit=document.getElementById('reaction-hit-btn');if(hit){hit.disabled=true;hit.innerText=`${round}/3 라운드 준비`;hit.className='w-full h-48 sm:h-56 rounded-3xl bg-slate-200 text-slate-500 font-black text-3xl sm:text-4xl shadow-inner border-4 border-slate-300 transition-all select-none disabled:cursor-not-allowed';}const msg=document.getElementById('reaction-message');if(msg)msg.innerText=opponent?(round===1?'두 학급 모두 준비 완료를 눌러주세요.':`${round}/3 라운드를 준비합니다.`):'다른 학급이 도전장을 수락하기를 기다리는 중입니다.';setReactionStatus(opponent?`${round}/3 라운드 준비`:'도전 수락 대기',opponent?'amber':'slate');tryStartReactionRound(room);return;}
       if(room.status==='countdown'&&room.startAt){scheduleReactionGo(room.startAt,me);return;}if(room.status==='finished')showReactionFinished(room,me,opponent);
     }
 
     function scheduleReactionGo(startAt,me){
-      clearReactionTimers();const hit=document.getElementById('reaction-hit-btn'),msg=document.getElementById('reaction-message');if(!hit)return;hit.disabled=!!(me&&me.result);hit.innerText='기다리세요...';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-rose-500 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-rose-300 transition-all select-none active:scale-[0.99]';if(msg)msg.innerText='아직 누르지 마세요. GO! 신호를 기다리세요.';setReactionStatus('신호 대기','rose');const delay=Math.max(0,startAt-reactionServerNow());reactionGoTimer=setTimeout(()=>{if(!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const currentMe=reactionLastRoom.players&&reactionLastRoom.players[reactionPlayerSlot];if(currentMe&&currentMe.result)return;hit.disabled=false;hit.innerText='GO!';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-4xl sm:text-5xl shadow-xl border-4 border-emerald-300 transition-all select-none active:scale-95';if(msg)msg.innerText='지금 누르세요!';setReactionStatus('GO!','emerald');},delay);reactionTimeoutTimer=setTimeout(()=>autoReactionTimeout(),delay+5000);
+      clearReactionTimers();
+      const hit=document.getElementById('reaction-hit-btn'),msg=document.getElementById('reaction-message');
+      if(!hit)return;
+      const round=Math.min(3,Math.max(1,Number((reactionLastRoom&&reactionLastRoom.round)||1)));
+      hit.disabled=!!(me&&me.result);
+      hit.innerText=`${round}/3 기다리세요...`;
+      hit.className='w-full h-48 sm:h-56 rounded-3xl bg-rose-500 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-rose-300 transition-all select-none active:scale-[0.99]';
+      if(msg)msg.innerText=`${round}/3 라운드 - 아직 누르지 마세요. GO! 신호를 기다리세요.`;
+      setReactionStatus(`${round}/3 신호 대기`,'rose');
+      const delay=Math.max(0,startAt-reactionServerNow());
+      reactionGoTimer=setTimeout(()=>{
+        if(!reactionLastRoom||reactionLastRoom.status!=='countdown')return;
+        const currentMe=reactionLastRoom.players&&reactionLastRoom.players[reactionPlayerSlot];
+        if(currentMe&&currentMe.result)return;
+        hit.disabled=false;
+        hit.innerText='GO!';
+        hit.className='w-full h-48 sm:h-56 rounded-3xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-4xl sm:text-5xl shadow-xl border-4 border-emerald-300 transition-all select-none active:scale-95';
+        if(msg)msg.innerText=`${round}/3 라운드 - 지금 누르세요!`;
+        setReactionStatus(`${round}/3 GO!`,'emerald');
+      },delay);
+      reactionTimeoutTimer=setTimeout(()=>autoReactionTimeout(),delay+5000);
     }
 
     async function hitReactionButton(){if(!reactionRoomRef||!reactionPlayerSlot||!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const startAt=Number(reactionLastRoom.startAt||0),now=reactionServerNow(),resultRef=reactionRoomRef.child(`players/${reactionPlayerSlot}/result`),payload=now<startAt?{falseStart:true,at:firebase.database.ServerValue.TIMESTAMP}:{ms:Math.max(0,Math.round(now-startAt)),at:firebase.database.ServerValue.TIMESTAMP};const tx=await resultRef.transaction(current=>current?undefined:payload);if(tx.committed){const hit=document.getElementById('reaction-hit-btn');if(hit)hit.disabled=true;await finalizeReactionRoomIfPossible();}}
     async function autoReactionTimeout(){if(!reactionRoomRef||!reactionPlayerSlot||!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const r=reactionRoomRef.child(`players/${reactionPlayerSlot}/result`);await r.transaction(current=>current?undefined:({timeout:true,at:firebase.database.ServerValue.TIMESTAMP}));await finalizeReactionRoomIfPossible();}
-    async function finalizeReactionRoomIfPossible(){if(!reactionRoomRef)return;await reactionRoomRef.transaction(room=>{if(!room||room.status!=='countdown'||!room.players||!room.players.p1||!room.players.p2)return;const r1=room.players.p1.result,r2=room.players.p2.result;if(!r1||!r2)return;room.status='finished';room.finishedAt=firebase.database.ServerValue.TIMESTAMP;return room;});}
+    function reactionRoundScore(result){
+      if(!result)return 5000;
+      if(result.falseStart||result.timeout)return 5000;
+      if(typeof result.ms==='number'&&Number.isFinite(result.ms))return Math.max(0,Number(result.ms));
+      return 5000;
+    }
+
+    function getReactionAverage(room,slot){
+      const rounds=room&&room.roundResults?room.roundResults:{};
+      const values=[];
+      for(let i=1;i<=3;i++){
+        const round=rounds[`r${i}`];
+        if(round&&round[slot])values.push(reactionRoundScore(round[slot]));
+      }
+      return values.length===3?Math.round(values.reduce((a,b)=>a+b,0)/3):null;
+    }
+
+    async function finalizeReactionRoomIfPossible(){
+      if(!reactionRoomRef)return;
+      await reactionRoomRef.transaction(room=>{
+        if(!room||room.status!=='countdown'||!room.players||!room.players.p1||!room.players.p2)return;
+        const r1=room.players.p1.result,r2=room.players.p2.result;
+        if(!r1||!r2)return;
+
+        const round=Math.min(3,Math.max(1,Number(room.round||1)));
+        if(!room.roundResults)room.roundResults={};
+        room.roundResults[`r${round}`]={p1:r1,p2:r2};
+
+        if(round<3){
+          room.round=round+1;
+          room.status='waiting';
+          room.startAt=null;
+          room.players.p1.result=null;
+          room.players.p2.result=null;
+        }else{
+          room.status='finished';
+          room.finishedAt=firebase.database.ServerValue.TIMESTAMP;
+        }
+        return room;
+      });
+    }
 
     function showReactionFinished(room,me,opponent){
-      clearReactionTimers();const hit=document.getElementById('reaction-hit-btn');if(hit){hit.disabled=true;hit.innerText='대전 종료';hit.className='w-full h-48 sm:h-56 rounded-3xl bg-slate-700 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-slate-500 transition-all select-none disabled:cursor-not-allowed';}
-      const msg=document.getElementById('reaction-message');let text='대전이 종료되었습니다.';const myResult=me&&me.result,opResult=opponent&&opponent.result,myBad=myResult&&(myResult.falseStart||myResult.timeout),opBad=opResult&&(opResult.falseStart||opResult.timeout);
-      if(myBad&&!opBad)text=`😢 ${me.className} 패배! 부정 출발 또는 시간 초과입니다.`;else if(!myBad&&opBad)text=`🏆 ${me.className} 승리! 상대 학급이 기록에 실패했습니다.`;else if(myBad&&opBad)text='🤝 두 학급 모두 기록 실패입니다.';else if(myResult&&opResult&&typeof myResult.ms==='number'&&typeof opResult.ms==='number'){if(myResult.ms<opResult.ms)text=`🏆 ${me.className} 승리! ${Math.round(opResult.ms-myResult.ms)}ms 더 빨랐습니다.`;else if(myResult.ms>opResult.ms)text=`😢 ${opponent.className} 승리! ${Math.round(myResult.ms-opResult.ms)}ms 더 빨랐습니다.`;else text='🤝 무승부! 두 학급의 기록이 같습니다.';}
-      if(msg)msg.innerText=text+' 대전 취소 / 나가기를 누르면 새 도전을 시작할 수 있습니다.';setReactionStatus('대전 종료','indigo');const readyBtn=document.getElementById('reaction-ready-btn');if(readyBtn)readyBtn.disabled=true;
-      if(myResult&&typeof myResult.ms==='number') saveReactionClassBest(me.className,myResult).catch(e=>console.error('Reaction leaderboard save failed:',e));
+      clearReactionTimers();
+      const hit=document.getElementById('reaction-hit-btn');
+      if(hit){
+        hit.disabled=true;
+        hit.innerText='3라운드 종료';
+        hit.className='w-full h-48 sm:h-56 rounded-3xl bg-slate-700 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-slate-500 transition-all select-none disabled:cursor-not-allowed';
+      }
+
+      const myAvg=getReactionAverage(room,reactionPlayerSlot);
+      const otherSlot=reactionPlayerSlot==='p1'?'p2':'p1';
+      const opAvg=getReactionAverage(room,otherSlot);
+      const mine=document.getElementById('reaction-my-result');
+      const opp=document.getElementById('reaction-opponent-result');
+      if(mine)mine.innerText=myAvg!==null?`${myAvg} ms 평균`:'-';
+      if(opp)opp.innerText=opAvg!==null?`${opAvg} ms 평균`:'-';
+
+      const msg=document.getElementById('reaction-message');
+      let text='3라운드 평균 대전이 종료되었습니다.';
+      if(myAvg!==null&&opAvg!==null){
+        if(myAvg<opAvg)text=`🏆 ${me.className} 승리! 3라운드 평균 ${myAvg}ms (${opAvg-myAvg}ms 우세)`;
+        else if(myAvg>opAvg)text=`😢 ${opponent.className} 승리! 3라운드 평균 ${opAvg}ms (${myAvg-opAvg}ms 우세)`;
+        else text=`🤝 무승부! 두 학급 모두 평균 ${myAvg}ms`;
+      }
+      if(msg)msg.innerText=text+' 대전 취소 / 나가기를 누르면 새 도전을 시작할 수 있습니다.';
+      setReactionStatus('3라운드 종료','indigo');
+      const readyBtn=document.getElementById('reaction-ready-btn');
+      if(readyBtn)readyBtn.disabled=true;
+
+      // 명예의 전당에는 단발 기록이 아니라 3회 평균 기록을 저장
+      if(myAvg!==null)saveReactionClassBest(me.className,{ms:myAvg}).catch(e=>console.error('Reaction leaderboard save failed:',e));
     }
 
     // RENDER ALL VIEWS
