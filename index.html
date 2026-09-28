@@ -202,14 +202,14 @@
 
     <!-- VIEW: CLASSROOM CLOCK -->
     <section id="view-clock" class="hidden space-y-6">
-      <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 min-h-[62vh] flex flex-col items-center justify-center">
-        <div class="w-full flex justify-end mb-4">
+      <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 min-h-[62vh] flex flex-col items-center justify-center">
+        <div class="w-full flex justify-end mb-2">
           <button id="clock-mode-toggle" onclick="toggleClassroomClockMode()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm px-4 py-2 rounded-xl font-extrabold transition shadow-sm flex items-center">
             <i class="fa-solid fa-digital-tachograph mr-1.5"></i><span id="clock-mode-toggle-text">디지털 숫자로 보기</span>
           </button>
         </div>
 
-        <div id="classroom-analog-clock" class="relative w-[min(78vw,560px)] aspect-square rounded-full bg-gradient-to-br from-white via-slate-50 to-indigo-50 border-[12px] border-indigo-700 shadow-2xl ring-4 ring-indigo-100">
+        <div id="classroom-analog-clock" class="relative w-[min(68vw,62vh,500px)] aspect-square rounded-full bg-gradient-to-br from-white via-slate-50 to-indigo-50 border-[10px] border-indigo-700 shadow-2xl ring-4 ring-indigo-100">
           <div class="absolute inset-[3.5%] rounded-full border-2 border-slate-200/90 shadow-inner"></div>
           <div id="analog-hour-marks" class="absolute inset-0"></div>
           <div class="absolute left-1/2 top-1/2 w-[25%] h-3 bg-slate-900 rounded-full origin-left z-[4] shadow-sm" id="clock-hour-hand"></div>
