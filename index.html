@@ -34,6 +34,15 @@
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
+
+  <!-- PWA -->
+  <meta name="theme-color" content="#4338ca">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
 
@@ -203,7 +212,10 @@
     <!-- VIEW: CLASSROOM CLOCK -->
     <section id="view-clock" class="hidden space-y-6">
       <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 min-h-[62vh] flex flex-col items-center justify-center">
-        <div class="w-full flex justify-end mb-2">
+        <div class="w-full flex justify-end mb-2 gap-2">
+          <button id="clock-fullscreen-toggle" onclick="toggleClassroomFullscreen()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs sm:text-sm px-4 py-2 rounded-xl font-extrabold transition shadow-sm flex items-center" title="전체화면 전환">
+            <i class="fa-solid fa-expand mr-1.5"></i><span id="clock-fullscreen-toggle-text">전체화면</span>
+          </button>
           <button id="clock-mode-toggle" onclick="toggleClassroomClockMode()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm px-4 py-2 rounded-xl font-extrabold transition shadow-sm flex items-center">
             <i class="fa-solid fa-digital-tachograph mr-1.5"></i><span id="clock-mode-toggle-text">디지털 숫자로 보기</span>
           </button>
@@ -1865,6 +1877,30 @@
       }
     }
 
+
+    async function toggleClassroomFullscreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (e) {
+        console.error('Fullscreen toggle failed:', e);
+        showToast("이 실행 방식에서는 전체화면을 사용할 수 없습니다.", true);
+      }
+    }
+
+    function updateFullscreenButton() {
+      const label = document.getElementById('clock-fullscreen-toggle-text');
+      const icon = document.querySelector('#clock-fullscreen-toggle i');
+      const active = !!document.fullscreenElement;
+      if (label) label.innerText = active ? '전체화면 종료' : '전체화면';
+      if (icon) icon.className = active ? 'fa-solid fa-compress mr-1.5' : 'fa-solid fa-expand mr-1.5';
+    }
+
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+
     function toggleClassroomClockMode() {
       classroomClockMode = classroomClockMode === 'analog' ? 'digital' : 'analog';
       const analog = document.getElementById('classroom-analog-clock');
@@ -2058,6 +2094,15 @@
 
     // INITIALIZATION ON LOAD
     window.addEventListener('beforeunload', () => detachFirebaseListeners());
+
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.error('Service worker registration failed:', err);
+        });
+      });
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
       const savedClass = localStorage.getItem('daechang_last_class');
