@@ -28,6 +28,11 @@
     .drag-handle { cursor: grab; }
     .drag-handle:active { cursor: grabbing; }
 
+    @keyframes clock-message-scroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-100%); }
+    }
+
     /* Custom Scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -241,6 +246,10 @@
           <div id="digital-clock-time" class="font-black tracking-tight text-slate-900 tabular-nums leading-none" style="font-size:clamp(4.5rem,16vw,11rem);">00:00:00</div>
           <div id="digital-clock-date" class="mt-6 text-xl sm:text-3xl font-extrabold text-slate-500">----</div>
         </div>
+
+        <div id="clock-class-message-wrap" class="w-full mt-4 overflow-hidden rounded-2xl bg-slate-900 border border-slate-700 shadow-inner hidden">
+          <div id="clock-class-message" class="whitespace-nowrap py-3 text-lg sm:text-2xl font-black text-yellow-300" style="display:inline-block; padding-left:100%; animation: clock-message-scroll 18s linear infinite;"></div>
+        </div>
       </div>
     </section>
 
@@ -444,6 +453,7 @@
             <span id="reaction-my-class" class="text-lg font-black text-cyan-800">-</span>
           </div>
           <button id="reaction-create-btn" onclick="createReactionRoom()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold py-3 rounded-xl text-sm transition">⚔️ 다른 학급에 도전장 보내기</button>
+          <button id="reaction-solo-btn" onclick="startSoloReactionGame()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 rounded-xl text-sm transition">🎯 혼자 플레이</button>
           <p class="text-[11px] text-slate-400 font-medium text-center">도전장을 보내면 다른 학급 태블릿에 즉시 알림이 표시됩니다.</p>
 
           <div id="reaction-room-panel" class="hidden space-y-3 pt-2 border-t border-slate-100">
@@ -643,7 +653,19 @@
         </div>
 
         <div class="space-y-6">
-
+          <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
+            <h3 class="text-base font-extrabold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
+              <i class="fa-solid fa-message text-indigo-600 mr-2"></i> 시계 화면 학급 전달 메시지
+            </h3>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1">시계 아래 흐르는 글씨</label>
+              <input type="text" id="clock-message-input" maxlength="150" placeholder="예: 오늘 7교시 후 교실 정리 및 종례가 있습니다." class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="saveClockClassMessage()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-sm transition">💬 메시지 저장</button>
+              <button onclick="clearClockClassMessage()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm transition">메시지 지우기</button>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -763,6 +785,7 @@
       selectedTimetableDay: null,
       praiseTemp: 75,
       praiseMsg: "목표 달성 시 학급 보상 지급!",
+      clockMessage: "",
       mealMenu: ["현미밥", "쇠고기미역국", "언양식불고기", "배추김치", "친환경 사과"],
       todos: [
         { id: 1, text: "수학 익힘책 42~45쪽 제출", done: false },
@@ -819,6 +842,7 @@
     let lastProcessedPacketId = null;
     let audioContext = null;
     let currentOscillator = null;
+    let callAlertRepeatTimer = null;
 
     function getClassKey(name = state.className) {
       return name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
@@ -836,6 +860,7 @@
         todos: state.todos,
         praiseTemp: state.praiseTemp,
         praiseMsg: state.praiseMsg,
+        clockMessage: state.clockMessage || "",
         moodLogs: state.moodLogs
       };
     }
@@ -1251,6 +1276,7 @@
           className: state.className,
           praiseTemp: state.praiseTemp,
           praiseMsg: state.praiseMsg,
+          clockMessage: state.clockMessage || "",
           todos: state.todos,
           timetable: state.timetable,
           moodLogs: state.moodLogs,
@@ -1320,9 +1346,25 @@
       } catch(e){}
     }
 
+    function startRepeatingCallAlert(isEmergency = false) {
+      if (callAlertRepeatTimer) clearInterval(callAlertRepeatTimer);
+      playAudioChime(isEmergency);
+      if (!isEmergency) {
+        callAlertRepeatTimer = setInterval(() => {
+          const modal = document.getElementById('call-modal');
+          if (modal && !modal.classList.contains('hidden')) playAudioChime(false);
+        }, 1800);
+      }
+    }
+
     function stopAudioAndCloseModal() {
+      if (callAlertRepeatTimer) {
+        clearInterval(callAlertRepeatTimer);
+        callAlertRepeatTimer = null;
+      }
       if (currentOscillator) {
         try { currentOscillator.stop(); } catch(e) {}
+        currentOscillator = null;
       }
       closeCallModal();
     }
@@ -1452,7 +1494,7 @@
       }
 
       document.getElementById('call-modal').classList.remove('hidden');
-      playAudioChime(isEmergency);
+      startRepeatingCallAlert(isEmergency);
     }
 
     function closeCallModal() {
@@ -1658,6 +1700,13 @@
 
 
     // REALTIME REACTION SPEED BATTLE - CLASS VS CLASS CHALLENGE
+    let soloReactionActive = false;
+    let soloReactionRound = 0;
+    let soloReactionResults = [];
+    let soloReactionStartAt = 0;
+    let soloReactionGoTimer = null;
+    let soloReactionTimeoutTimer = null;
+
     let reactionRoomCode = null;
     let reactionPlayerSlot = null;
     let reactionRoomRef = null;
@@ -1724,7 +1773,92 @@
       pendingReactionChallenge = null;
     }
 
+    function clearSoloReactionTimers() {
+      if (soloReactionGoTimer) clearTimeout(soloReactionGoTimer);
+      if (soloReactionTimeoutTimer) clearTimeout(soloReactionTimeoutTimer);
+      soloReactionGoTimer = null;
+      soloReactionTimeoutTimer = null;
+    }
+
+    function startSoloReactionGame() {
+      if (reactionRoomCode) return showToast('학급 대전 중에는 혼자 플레이를 시작할 수 없습니다.', true);
+      clearSoloReactionTimers();
+      soloReactionActive = true;
+      soloReactionRound = 0;
+      soloReactionResults = [];
+      const panel = document.getElementById('reaction-room-panel');
+      if (panel) panel.classList.add('hidden');
+      const mine = document.getElementById('reaction-my-result');
+      const opp = document.getElementById('reaction-opponent-result');
+      if (mine) mine.innerText = '-';
+      if (opp) opp.innerText = '혼자 플레이';
+      startNextSoloReactionRound();
+    }
+
+    function startNextSoloReactionRound() {
+      if (!soloReactionActive) return;
+      clearSoloReactionTimers();
+      soloReactionRound += 1;
+      const hit = document.getElementById('reaction-hit-btn');
+      const msg = document.getElementById('reaction-message');
+      if (!hit) return;
+      hit.disabled = false;
+      hit.innerText = `${soloReactionRound}/3 기다리세요...`;
+      hit.className = 'w-full h-48 sm:h-56 rounded-3xl bg-rose-500 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-rose-300 transition-all select-none active:scale-[0.99]';
+      if (msg) msg.innerText = `${soloReactionRound}/3 라운드 - 아직 누르지 마세요. GO! 신호를 기다리세요.`;
+      setReactionStatus(`혼자 ${soloReactionRound}/3 신호 대기`, 'rose');
+      const delay = 1800 + Math.random() * 2700;
+      soloReactionStartAt = performance.now() + delay;
+      soloReactionGoTimer = setTimeout(() => {
+        if (!soloReactionActive) return;
+        hit.disabled = false;
+        hit.innerText = 'GO!';
+        hit.className = 'w-full h-48 sm:h-56 rounded-3xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-4xl sm:text-5xl shadow-xl border-4 border-emerald-300 transition-all select-none active:scale-95';
+        if (msg) msg.innerText = `${soloReactionRound}/3 라운드 - 지금 누르세요!`;
+        setReactionStatus(`혼자 ${soloReactionRound}/3 GO!`, 'emerald');
+      }, delay);
+      soloReactionTimeoutTimer = setTimeout(() => finishSoloReactionRound(5000, '시간 초과'), delay + 5000);
+    }
+
+    function hitSoloReactionButton() {
+      if (!soloReactionActive) return false;
+      const now = performance.now();
+      if (now < soloReactionStartAt) {
+        finishSoloReactionRound(5000, '부정 출발');
+      } else {
+        finishSoloReactionRound(Math.max(0, Math.round(now - soloReactionStartAt)), null);
+      }
+      return true;
+    }
+
+    function finishSoloReactionRound(ms, label) {
+      if (!soloReactionActive) return;
+      clearSoloReactionTimers();
+      soloReactionResults.push(ms);
+      const hit = document.getElementById('reaction-hit-btn');
+      const msg = document.getElementById('reaction-message');
+      const mine = document.getElementById('reaction-my-result');
+      if (hit) {
+        hit.disabled = true;
+        hit.innerText = label || `${ms} ms`;
+        hit.className = 'w-full h-48 sm:h-56 rounded-3xl bg-slate-700 text-white font-black text-3xl sm:text-4xl shadow-lg border-4 border-slate-500 transition-all select-none disabled:cursor-not-allowed';
+      }
+      if (mine) mine.innerText = label || `${ms} ms`;
+      if (soloReactionRound < 3) {
+        if (msg) msg.innerText = `${soloReactionRound}/3 결과: ${label || `${ms} ms`} · 다음 라운드를 준비합니다.`;
+        setReactionStatus(`혼자 ${soloReactionRound}/3 완료`, 'indigo');
+        soloReactionGoTimer = setTimeout(startNextSoloReactionRound, 1300);
+      } else {
+        const avg = Math.round(soloReactionResults.reduce((a,b) => a+b, 0) / 3);
+        soloReactionActive = false;
+        if (mine) mine.innerText = `${avg} ms 평균`;
+        if (msg) msg.innerText = `🎯 혼자 플레이 종료! 3라운드 평균 ${avg}ms · 다시 하려면 '혼자 플레이'를 누르세요.`;
+        setReactionStatus('혼자 플레이 종료', 'indigo');
+      }
+    }
+
     async function createReactionRoom() {
+      if (soloReactionActive) { soloReactionActive = false; clearSoloReactionTimers(); }
       if (reactionRoomCode) return showToast('이미 대전방에 연결되어 있습니다.', true);
       try {
         const user = await ensureReactionAuth();
@@ -1956,7 +2090,7 @@
       reactionTimeoutTimer=setTimeout(()=>autoReactionTimeout(),delay+5000);
     }
 
-    async function hitReactionButton(){if(!reactionRoomRef||!reactionPlayerSlot||!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const startAt=Number(reactionLastRoom.startAt||0),now=reactionServerNow(),resultRef=reactionRoomRef.child(`players/${reactionPlayerSlot}/result`),payload=now<startAt?{falseStart:true,at:firebase.database.ServerValue.TIMESTAMP}:{ms:Math.max(0,Math.round(now-startAt)),at:firebase.database.ServerValue.TIMESTAMP};const tx=await resultRef.transaction(current=>current?undefined:payload);if(tx.committed){const hit=document.getElementById('reaction-hit-btn');if(hit)hit.disabled=true;await finalizeReactionRoomIfPossible();}}
+    async function hitReactionButton(){if(soloReactionActive){hitSoloReactionButton();return;}if(!reactionRoomRef||!reactionPlayerSlot||!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const startAt=Number(reactionLastRoom.startAt||0),now=reactionServerNow(),resultRef=reactionRoomRef.child(`players/${reactionPlayerSlot}/result`),payload=now<startAt?{falseStart:true,at:firebase.database.ServerValue.TIMESTAMP}:{ms:Math.max(0,Math.round(now-startAt)),at:firebase.database.ServerValue.TIMESTAMP};const tx=await resultRef.transaction(current=>current?undefined:payload);if(tx.committed){const hit=document.getElementById('reaction-hit-btn');if(hit)hit.disabled=true;await finalizeReactionRoomIfPossible();}}
     async function autoReactionTimeout(){if(!reactionRoomRef||!reactionPlayerSlot||!reactionLastRoom||reactionLastRoom.status!=='countdown')return;const r=reactionRoomRef.child(`players/${reactionPlayerSlot}/result`);await r.transaction(current=>current?undefined:({timeout:true,at:firebase.database.ServerValue.TIMESTAMP}));await finalizeReactionRoomIfPossible();}
     function reactionRoundScore(result){
       if(!result)return 5000;
@@ -2097,6 +2231,35 @@
       }).join('');
     }
 
+    function renderClockClassMessage() {
+      const wrap = document.getElementById('clock-class-message-wrap');
+      const text = document.getElementById('clock-class-message');
+      const input = document.getElementById('clock-message-input');
+      const message = String(state.clockMessage || '').trim();
+      if (input && document.activeElement !== input) input.value = message;
+      if (!wrap || !text) return;
+      text.innerText = message;
+      wrap.classList.toggle('hidden', !message);
+    }
+
+    function saveClockClassMessage() {
+      const input = document.getElementById('clock-message-input');
+      if (!input) return;
+      state.clockMessage = input.value.trim();
+      saveStateLocally(true);
+      renderClockClassMessage();
+      showToast('시계 화면 학급 메시지가 저장되었습니다. 💬');
+    }
+
+    function clearClockClassMessage() {
+      const input = document.getElementById('clock-message-input');
+      if (input) input.value = '';
+      state.clockMessage = '';
+      saveStateLocally(true);
+      renderClockClassMessage();
+      showToast('시계 화면 학급 메시지를 지웠습니다.');
+    }
+
     function renderAll() {
       const classLabel = document.getElementById('current-class-label');
       if (classLabel) classLabel.innerText = state.className;
@@ -2123,6 +2286,7 @@
       renderMoodLogTable();
       renderClickRaceLeaderboard();
       renderReactionLeaderboard();
+      renderClockClassMessage();
       loadDayTimetableEditor();
       renderMealEditor();
       renderTodoEditor();
@@ -2376,9 +2540,9 @@
       showToast("공통 급식 식단이 저장되었습니다. 🍽️");
     }
 
-    // 10분 동안 사용자 조작이 없으면 기본 화면인 시계 탭으로 자동 복귀
+    // 3분 동안 사용자 조작이 없으면 기본 화면인 시계 탭으로 자동 복귀
     let classroomInactivityTimer = null;
-    const CLASSROOM_INACTIVITY_MS = 10 * 60 * 1000;
+    const CLASSROOM_INACTIVITY_MS = 3 * 60 * 1000;
 
     function resetClassroomInactivityTimer() {
       if (classroomInactivityTimer) clearTimeout(classroomInactivityTimer);
