@@ -29,7 +29,7 @@
     .drag-handle:active { cursor: grabbing; }
 
     @keyframes clock-message-scroll {
-      from { transform: translateX(0); }
+      from { transform: translateX(100%); }
       to { transform: translateX(-100%); }
     }
 
@@ -83,7 +83,10 @@
         </div>
       </div>
 
-      <div class="ml-auto flex items-center">
+      <div class="ml-auto flex items-center gap-2">
+        <span id="clock-auto-countdown" class="bg-indigo-900/90 text-indigo-100 text-xs sm:text-sm px-3 py-2 rounded-xl font-bold border border-indigo-500/40 tabular-nums" title="아무 조작이 없으면 시계 화면으로 자동 전환됩니다.">
+          <i class="fa-solid fa-hourglass-half mr-1.5 text-yellow-300"></i>시계 자동전환 <span id="clock-auto-countdown-time">03:00</span>
+        </span>
         <button id="clock-fullscreen-toggle" onclick="toggleClassroomFullscreen()" class="bg-indigo-900/90 hover:bg-indigo-950 text-white text-xs sm:text-sm px-3.5 py-2 rounded-xl font-extrabold transition shadow-sm flex items-center border border-indigo-500/40" title="전체화면 전환">
           <i class="fa-solid fa-expand mr-1.5"></i><span id="clock-fullscreen-toggle-text">전체화면</span>
         </button>
@@ -248,7 +251,9 @@
         </div>
 
         <div id="clock-class-message-wrap" class="w-full mt-4 overflow-hidden rounded-2xl bg-slate-900 border border-slate-700 shadow-inner hidden">
-          <div id="clock-class-message" class="whitespace-nowrap py-3 text-lg sm:text-2xl font-black text-yellow-300" style="display:inline-block; padding-left:100%; animation: clock-message-scroll 18s linear infinite;"></div>
+          <div class="w-full overflow-hidden py-3">
+            <div id="clock-class-message" class="whitespace-nowrap text-lg sm:text-2xl font-black text-yellow-300" style="width:max-content; animation: clock-message-scroll 18s linear infinite;"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -2542,11 +2547,32 @@
 
     // 3분 동안 사용자 조작이 없으면 기본 화면인 시계 탭으로 자동 복귀
     let classroomInactivityTimer = null;
+    let classroomInactivityCountdownTimer = null;
+    let classroomInactivityDeadline = 0;
     const CLASSROOM_INACTIVITY_MS = 3 * 60 * 1000;
+
+    function updateClassroomInactivityCountdown() {
+      const display = document.getElementById('clock-auto-countdown-time');
+      if (!display) return;
+      const remainingMs = Math.max(0, classroomInactivityDeadline - Date.now());
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+      display.innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
 
     function resetClassroomInactivityTimer() {
       if (classroomInactivityTimer) clearTimeout(classroomInactivityTimer);
+      if (classroomInactivityCountdownTimer) clearInterval(classroomInactivityCountdownTimer);
+      classroomInactivityDeadline = Date.now() + CLASSROOM_INACTIVITY_MS;
+      updateClassroomInactivityCountdown();
+      classroomInactivityCountdownTimer = setInterval(updateClassroomInactivityCountdown, 1000);
       classroomInactivityTimer = setTimeout(() => {
+        if (classroomInactivityCountdownTimer) {
+          clearInterval(classroomInactivityCountdownTimer);
+          classroomInactivityCountdownTimer = null;
+        }
+        updateClassroomInactivityCountdown();
         // 교사 화면이었다면 인증 상태도 함께 종료하여 화면 노출을 막는다.
         if (state.isTeacherAuthenticated) {
           state.isTeacherAuthenticated = false;
