@@ -230,29 +230,14 @@
     <!-- VIEW: CLASSROOM CLOCK -->
     <section id="view-clock" class="hidden space-y-6">
       <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200 min-h-[62vh] flex flex-col items-center justify-center">
-        <div class="w-full flex justify-end mb-2 gap-2">
-          <button id="clock-mode-toggle" onclick="toggleClassroomClockMode()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm px-4 py-2 rounded-xl font-extrabold transition shadow-sm flex items-center">
-            <i class="fa-solid fa-digital-tachograph mr-1.5"></i><span id="clock-mode-toggle-text">디지털 숫자로 보기</span>
-          </button>
-        </div>
-
-        <div id="classroom-analog-clock" class="relative w-[min(68vw,62vh,500px)] aspect-square rounded-full bg-gradient-to-br from-white via-slate-50 to-indigo-50 border-[10px] border-indigo-700 shadow-2xl ring-4 ring-indigo-100">
-          <div class="absolute inset-[3.5%] rounded-full border-2 border-slate-200/90 shadow-inner"></div>
-          <div id="analog-hour-marks" class="absolute inset-0"></div>
-          <div class="absolute left-1/2 top-1/2 w-[25%] h-3 bg-slate-900 rounded-full origin-left z-[4] shadow-sm" id="clock-hour-hand"></div>
-          <div class="absolute left-1/2 top-1/2 w-[36%] h-2 bg-indigo-700 rounded-full origin-left z-[5] shadow-sm" id="clock-minute-hand"></div>
-          <div class="absolute left-1/2 top-1/2 w-[40%] h-1 bg-rose-500 rounded-full origin-left z-[6]" id="clock-second-hand"></div>
-          <div class="absolute left-1/2 top-1/2 w-7 h-7 bg-indigo-700 rounded-full -translate-x-1/2 -translate-y-1/2 z-10 border-[5px] border-white shadow-md"></div>
-        </div>
-
-        <div id="classroom-digital-clock" class="hidden w-full text-center py-12">
+        <div id="classroom-digital-clock" class="w-full text-center py-12">
           <div id="digital-clock-time" class="font-black tracking-tight text-slate-900 tabular-nums leading-none" style="font-size:clamp(4.5rem,16vw,11rem);">00:00:00</div>
           <div id="digital-clock-date" class="mt-6 text-xl sm:text-3xl font-extrabold text-slate-500">----</div>
         </div>
 
         <div id="clock-class-message-wrap" class="w-full mt-4 overflow-hidden rounded-2xl bg-indigo-50 border-2 border-indigo-200 shadow-sm hidden">
           <div class="w-full min-h-[96px] sm:min-h-[120px] overflow-hidden py-5 sm:py-7 flex items-center">
-            <div id="clock-class-message" class="whitespace-nowrap text-3xl sm:text-5xl font-black text-indigo-800 leading-none" style="width:max-content; animation: clock-message-scroll 18s linear infinite;"></div>
+            <div id="clock-class-message" class="whitespace-nowrap text-5xl sm:text-7xl font-black text-black leading-none" style="width:max-content; animation: clock-message-scroll 18s linear infinite;"></div>
           </div>
         </div>
       </div>
@@ -2592,7 +2577,7 @@
       resetClassroomInactivityTimer();
     }
 
-    let classroomClockMode = 'analog';
+    let classroomClockMode = 'digital';
 
     function buildAnalogClockMarks() {
       const container = document.getElementById('analog-hour-marks');
