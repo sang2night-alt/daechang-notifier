@@ -38,6 +38,87 @@
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+
+    /* Mobile responsive header/navigation optimization */
+    @media (max-width: 640px) {
+      header > div.max-w-7xl {
+        padding: 0.65rem 0.75rem;
+        gap: 0.6rem;
+      }
+
+      /* Brand block gets the full row so status text is not squeezed */
+      header > div.max-w-7xl > div:first-child {
+        width: 100%;
+        min-width: 0;
+      }
+      header > div.max-w-7xl > div:first-child > div:last-child {
+        min-width: 0;
+        flex: 1;
+      }
+      header > div.max-w-7xl > div:first-child > div:last-child > div:first-child {
+        flex-wrap: wrap;
+        row-gap: 0.25rem;
+      }
+      header > div.max-w-7xl > div:first-child > div:last-child > div:nth-child(2) {
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
+      }
+      #current-date-time { white-space: nowrap; }
+      #sync-status-indicator {
+        max-width: 100%;
+        white-space: nowrap;
+      }
+      #sync-channel-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Clock/fullscreen controls stay compact on their own row */
+      header > div.max-w-7xl > div.ml-auto {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-end;
+      }
+      #clock-auto-countdown,
+      #clock-fullscreen-toggle {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      /* The important fix: don't squeeze seven nav buttons into the phone width. */
+      header nav {
+        width: calc(100vw - 1.5rem);
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        gap: 0.2rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        scroll-snap-type: x proximity;
+      }
+      header nav::-webkit-scrollbar { display: none; }
+      header nav button {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: max-content;
+        white-space: nowrap !important;
+        word-break: keep-all;
+        writing-mode: horizontal-tb;
+        scroll-snap-align: start;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+      }
+      header nav button i { flex: 0 0 auto; }
+
+      main { padding: 0.8rem !important; }
+      #view-notifier { gap: 1rem; }
+      #card-grid { gap: 1rem; }
+      .grid-item { border-radius: 1.25rem; padding: 1rem; }
+    }
+
   </style>
 
   <!-- PWA -->
