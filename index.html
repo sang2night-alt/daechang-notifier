@@ -109,6 +109,9 @@
         <button id="tab-btn-gamecenter" onclick="switchTab('gamecenter')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
           <i class="fa-solid fa-gamepad mr-1.5 text-yellow-300"></i> 게임센터
         </button>
+        <button id="tab-btn-academic" onclick="switchTab('academic')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
+          <i class="fa-solid fa-calendar-days mr-1.5"></i> 학사일정표
+        </button>
         <button id="tab-btn-teacher" onclick="switchTab('teacher')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-yellow-300 hover:bg-indigo-700/80 transition flex items-center">
           <i id="teacher-tab-icon" class="fa-solid fa-lock mr-1.5"></i>
           <span id="teacher-tab-text">교사 대시보드</span>
@@ -485,6 +488,31 @@
 
     </section>
 
+    <!-- VIEW: ACADEMIC SCHEDULE -->
+    <section id="view-academic" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-xl sm:text-2xl font-black text-slate-800 flex items-center">
+              <i class="fa-solid fa-calendar-days text-indigo-600 mr-3"></i> 학사일정표
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">학교의 연간 학사일정을 날짜와 함께 등록하고 확인합니다.</p>
+          </div>
+          <span id="academic-year-label" class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-extrabold px-3 py-1.5 rounded-xl"></span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] gap-2 mt-5">
+          <input type="date" id="academic-date-input" class="border border-slate-300 rounded-xl p-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500">
+          <input type="text" id="academic-title-input" maxlength="100" placeholder="학사일정을 입력하세요. 예: 1학기 중간고사" onkeydown="if(event.key === 'Enter') addAcademicSchedule()" class="border border-slate-300 rounded-xl p-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500">
+          <button onclick="addAcademicSchedule()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-sm transition whitespace-nowrap">
+            <i class="fa-solid fa-plus mr-1.5"></i> 일정 추가
+          </button>
+        </div>
+
+        <div id="academic-schedule-board" class="mt-6 space-y-5"></div>
+      </div>
+    </section>
+
     <!-- VIEW 4: TEACHER DASHBOARD -->
     <section id="view-teacher" class="hidden space-y-6">
       <div class="bg-slate-800 text-white p-5 rounded-3xl shadow-md flex flex-wrap justify-between items-center gap-3">
@@ -651,6 +679,13 @@
               <label class="block text-xs font-bold text-slate-600 mb-1">시계 아래 흐르는 글씨</label>
               <input type="text" id="clock-message-input" maxlength="150" placeholder="예: 오늘 7교시 후 교실 정리 및 종례가 있습니다." class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1">전광판 글씨 색상</label>
+              <div class="flex items-center gap-3">
+                <input type="color" id="clock-message-color-input" value="#000000" class="w-14 h-10 border border-slate-300 rounded-xl p-1 bg-white cursor-pointer">
+                <span class="text-xs text-slate-400 font-medium">원하는 글씨 색상을 선택한 뒤 메시지를 저장하세요.</span>
+              </div>
+            </div>
             <div class="grid grid-cols-2 gap-2">
               <button onclick="saveClockClassMessage()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-sm transition">💬 메시지 저장</button>
               <button onclick="clearClockClassMessage()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm transition">메시지 지우기</button>
@@ -776,6 +811,8 @@
       praiseTemp: 75,
       praiseMsg: "목표 달성 시 학급 보상 지급!",
       clockMessage: "",
+      clockMessageColor: "#000000",
+      academicSchedule: [],
       mealMenu: ["현미밥", "쇠고기미역국", "언양식불고기", "배추김치", "친환경 사과"],
       todos: [
         { id: 1, text: "수학 익힘책 42~45쪽 제출", done: false },
@@ -851,6 +888,7 @@
         praiseTemp: state.praiseTemp,
         praiseMsg: state.praiseMsg,
         clockMessage: state.clockMessage || "",
+        clockMessageColor: state.clockMessageColor || "#000000",
         moodLogs: state.moodLogs
       };
     }
@@ -870,6 +908,7 @@
           ...(saved.cardSizes || {})
         },
         todos: Array.isArray(saved.todos) ? saved.todos : defaultState.todos,
+        academicSchedule: Array.isArray(saved.academicSchedule) ? saved.academicSchedule : defaultState.academicSchedule,
         moodLogs: Array.isArray(saved.moodLogs) ? saved.moodLogs : defaultState.moodLogs
       };
 
@@ -1030,11 +1069,12 @@
         const mealRef = firebaseDb.ref('common/mealMenu');
         const scoreRef = firebaseDb.ref('common/clickRaceScores');
         const reactionScoreRef = firebaseDb.ref('common/reactionScores');
+        const academicRef = firebaseDb.ref('common/academicSchedule');
         const eventRef = firebaseDb.ref(`events/${classKey}`);
 
         // First connection: Firebase wins if data already exists; otherwise seed it with this browser's local data.
-        const [classSnap, mealSnap, scoreSnap, reactionScoreSnap] = await Promise.all([
-          classRef.once('value'), mealRef.once('value'), scoreRef.once('value'), reactionScoreRef.once('value')
+        const [classSnap, mealSnap, scoreSnap, reactionScoreSnap, academicSnap] = await Promise.all([
+          classRef.once('value'), mealRef.once('value'), scoreRef.once('value'), reactionScoreRef.once('value'), academicRef.once('value')
         ]);
         if (myGeneration !== firebaseSyncGeneration) return;
 
@@ -1057,6 +1097,13 @@
           saveStateLocally(false);
         } else {
           await writeClassStateToFirebase();
+        }
+
+        if (academicSnap.exists()) {
+          state.academicSchedule = normalizeAcademicSchedule(academicSnap.val());
+          localStorage.setItem('daechang_shared_academic_schedule', JSON.stringify(state.academicSchedule));
+        } else {
+          await academicRef.set(state.academicSchedule || []);
         }
 
         if (mealSnap.exists()) {
@@ -1128,6 +1175,14 @@
         trackFirebaseListener(reactionScoreRef, 'value', reactionScoreCallback);
 
         // Event channel is used only for transient calls/test signals. Old events are never replayed as new alerts.
+        attachFirebaseListener(academicRef, 'value', snap => {
+          if (myGeneration !== firebaseSyncGeneration) return;
+          state.academicSchedule = normalizeAcademicSchedule(snap.val());
+          localStorage.setItem('daechang_shared_academic_schedule', JSON.stringify(state.academicSchedule));
+          renderAcademicSchedule();
+          renderTodos();
+        });
+
         const eventQuery = eventRef.orderByChild('_ts').startAt(firebaseSessionStartedAt);
         const eventCallback = snap => {
           const packet = snap.val();
@@ -1382,7 +1437,7 @@
 
       state.currentTab = tab;
       
-      ['notifier', 'clock', 'meal', 'mood', 'gamecenter', 'teacher'].forEach(t => {
+      ['notifier', 'clock', 'meal', 'mood', 'gamecenter', 'academic', 'teacher'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (view) view.classList.add('hidden');
 
@@ -2225,17 +2280,23 @@
       const wrap = document.getElementById('clock-class-message-wrap');
       const text = document.getElementById('clock-class-message');
       const input = document.getElementById('clock-message-input');
+      const colorInput = document.getElementById('clock-message-color-input');
       const message = String(state.clockMessage || '').trim();
+      const color = state.clockMessageColor || '#000000';
       if (input && document.activeElement !== input) input.value = message;
+      if (colorInput && document.activeElement !== colorInput) colorInput.value = color;
       if (!wrap || !text) return;
       text.innerText = message;
+      text.style.color = color;
       wrap.classList.toggle('hidden', !message);
     }
 
     function saveClockClassMessage() {
       const input = document.getElementById('clock-message-input');
+      const colorInput = document.getElementById('clock-message-color-input');
       if (!input) return;
       state.clockMessage = input.value.trim();
+      state.clockMessageColor = colorInput ? colorInput.value : (state.clockMessageColor || '#000000');
       saveStateLocally(true);
       renderClockClassMessage();
       showToast('시계 화면 학급 메시지가 저장되었습니다. 💬');
@@ -2248,6 +2309,116 @@
       saveStateLocally(true);
       renderClockClassMessage();
       showToast('시계 화면 학급 메시지를 지웠습니다.');
+    }
+
+    function normalizeAcademicSchedule(value) {
+      if (Array.isArray(value)) return value.filter(Boolean);
+      if (value && typeof value === 'object') return Object.values(value).filter(Boolean);
+      return [];
+    }
+
+    function getLocalDateKey(date = new Date()) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      }[ch]));
+    }
+
+    function renderAcademicSchedule() {
+      const board = document.getElementById('academic-schedule-board');
+      const yearLabel = document.getElementById('academic-year-label');
+      const dateInput = document.getElementById('academic-date-input');
+      const currentYear = new Date().getFullYear();
+      if (yearLabel) yearLabel.innerText = `${currentYear}학년도 연간 일정`;
+      if (dateInput && !dateInput.value) dateInput.value = getLocalDateKey();
+      if (!board) return;
+
+      const items = [...(state.academicSchedule || [])].sort((a, b) => {
+        const dateCompare = String(a.date || '').localeCompare(String(b.date || ''));
+        return dateCompare || Number(a.id || 0) - Number(b.id || 0);
+      });
+
+      if (items.length === 0) {
+        board.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm font-medium">등록된 학사일정이 없습니다.</div>`;
+        return;
+      }
+
+      const grouped = {};
+      items.forEach(item => {
+        const month = String(item.date || '').slice(0, 7) || '날짜 미정';
+        (grouped[month] ||= []).push(item);
+      });
+
+      board.innerHTML = Object.entries(grouped).map(([month, list]) => {
+        const [y, m] = month.split('-');
+        const title = y && m ? `${Number(m)}월` : month;
+        return `
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-sm font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-lg">${escapeHtml(title)}</span>
+              <div class="h-px bg-slate-200 flex-1"></div>
+            </div>
+            <div class="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white">
+              ${list.map(item => {
+                const parts = String(item.date || '').split('-');
+                const dateLabel = parts.length === 3 ? `${Number(parts[1])}월 ${Number(parts[2])}일` : (item.date || '-');
+                const isToday = item.date === getLocalDateKey();
+                return `
+                  <div class="flex items-center gap-4 p-3.5 ${isToday ? 'bg-amber-50' : 'bg-white'}">
+                    <div class="w-24 shrink-0 text-sm font-extrabold ${isToday ? 'text-amber-700' : 'text-slate-500'}">${escapeHtml(dateLabel)}</div>
+                    <div class="flex-1 min-w-0 text-sm font-bold text-slate-800">${escapeHtml(item.title || '')}</div>
+                    ${isToday ? '<span class="text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-1 rounded-lg">오늘</span>' : ''}
+                    <button onclick="deleteAcademicSchedule('${String(item.id).replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-700 px-2 py-1" title="일정 삭제"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function saveAcademicScheduleToFirebase() {
+      localStorage.setItem('daechang_shared_academic_schedule', JSON.stringify(state.academicSchedule || []));
+      try {
+        if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+        await firebaseDb.ref('common/academicSchedule').set(state.academicSchedule || []);
+      } catch (err) {
+        console.warn('학사일정 Firebase 저장 실패:', err);
+        showToast('학사일정 실시간 저장에 실패했습니다.', true);
+      }
+    }
+
+    async function addAcademicSchedule() {
+      const dateInput = document.getElementById('academic-date-input');
+      const titleInput = document.getElementById('academic-title-input');
+      const date = dateInput ? dateInput.value : '';
+      const title = titleInput ? titleInput.value.trim() : '';
+      if (!date || !title) {
+        showToast('날짜와 학사일정을 모두 입력해주세요.', true);
+        return;
+      }
+      state.academicSchedule = Array.isArray(state.academicSchedule) ? state.academicSchedule : [];
+      state.academicSchedule.push({ id: String(Date.now()), date, title });
+      if (titleInput) titleInput.value = '';
+      await saveAcademicScheduleToFirebase();
+      renderAcademicSchedule();
+      renderTodos();
+      showToast('학사일정이 추가되었습니다. 📅');
+    }
+
+    async function deleteAcademicSchedule(id) {
+      state.academicSchedule = (state.academicSchedule || []).filter(item => String(item.id) !== String(id));
+      await saveAcademicScheduleToFirebase();
+      renderAcademicSchedule();
+      renderTodos();
+      showToast('학사일정이 삭제되었습니다.');
     }
 
     function renderAll() {
@@ -2277,6 +2448,7 @@
       renderClickRaceLeaderboard();
       renderReactionLeaderboard();
       renderClockClassMessage();
+      renderAcademicSchedule();
       loadDayTimetableEditor();
       renderMealEditor();
       renderTodoEditor();
@@ -2349,15 +2521,21 @@
     function renderTodos() {
       const container = document.getElementById('todo-list-display');
       if (!container) return;
-      const activeCount = state.todos.filter(t => !t.done).length;
+
+      const todayKey = getLocalDateKey();
+      const todayAcademic = (state.academicSchedule || [])
+        .filter(item => item && item.date === todayKey && String(item.title || '').trim());
+
+      const activeCount = state.todos.filter(t => !t.done).length + todayAcademic.length;
       const todoBadge = document.getElementById('todo-count-badge');
       if (todoBadge) todoBadge.innerText = `${activeCount}개 남음`;
 
-      if (state.todos.length === 0) {
+      if (state.todos.length === 0 && todayAcademic.length === 0) {
         container.innerHTML = `<li class="text-slate-400 text-xs text-center py-6">등록된 할 일이 없습니다.</li>`;
         return;
       }
-      container.innerHTML = state.todos.map(t => `
+
+      const normalTodos = state.todos.map(t => `
         <li class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 shadow-sm">
           <label class="flex items-center space-x-2.5 cursor-pointer flex-1 min-w-0">
             <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})" class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
@@ -2366,6 +2544,18 @@
           <button onclick="deleteTodo(${t.id})" class="text-rose-500 hover:text-rose-700 px-2 py-1 ml-2" title="할 일 삭제"><i class="fa-solid fa-trash"></i></button>
         </li>
       `).join('');
+
+      const academicTodos = todayAcademic.map(item => `
+        <li class="flex items-center justify-between p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 shadow-sm">
+          <div class="flex items-center space-x-2.5 flex-1 min-w-0">
+            <span class="w-4 h-4 flex items-center justify-center text-indigo-600 shrink-0"><i class="fa-solid fa-calendar-day"></i></span>
+            <span class="text-xs sm:text-sm font-bold text-slate-700">${escapeHtml(item.title)}</span>
+          </div>
+          <span class="text-[10px] font-black text-indigo-700 bg-white border border-indigo-100 px-2 py-1 rounded-lg ml-2 whitespace-nowrap">📅 학사일정</span>
+        </li>
+      `).join('');
+
+      container.innerHTML = academicTodos + normalTodos;
     }
 
     function toggleTodo(id) {
