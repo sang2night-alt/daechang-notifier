@@ -1197,7 +1197,7 @@
           console.warn('학사일정 실시간 동기화 권한 오류(기존 Firebase 연결은 유지):', err);
         };
         academicRef.on('value', academicCallback, academicCancelCallback);
-        firebaseListeners.push({ ref: academicRef, eventType: 'value', callback: academicCallback });
+        firebaseActiveRefs.push({ ref: academicRef, eventType: 'value', callback: academicCallback });
 
         const eventQuery = eventRef.orderByChild('_ts').startAt(firebaseSessionStartedAt);
         const eventCallback = snap => {
