@@ -394,7 +394,7 @@
             </div>
 
             <div class="mt-6 flex flex-col items-center justify-center">
-              <button id="clickrace-btn" onclick="handleClickRaceBtn()" class="w-full h-44 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 hover:from-amber-500 hover:to-rose-600 text-white rounded-3xl font-black text-2xl shadow-xl transform active:scale-95 transition-all flex flex-col items-center justify-center space-y-2 border-4 border-amber-200/50 cursor-pointer select-none">
+              <button id="clickrace-btn" onclick="handleClickRaceBtn(event)" class="w-full h-44 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 hover:from-amber-500 hover:to-rose-600 text-white rounded-3xl font-black text-2xl shadow-xl transform active:scale-95 transition-all flex flex-col items-center justify-center space-y-2 border-4 border-amber-200/50 cursor-pointer select-none">
                 <i id="clickrace-btn-icon" class="fa-solid fa-hand-pointer text-4xl animate-pulse"></i>
                 <span id="clickrace-btn-text">게임 시작하기</span>
               </button>
@@ -580,6 +580,12 @@
               <i class="fa-solid fa-paper-plane"></i>
               <span>선택 대상 원격 호출 발송</span>
             </button>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 pt-1">
+              <input type="datetime-local" id="call-schedule-time" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none">
+              <button onclick="scheduleStudentCall(false)" class="bg-slate-700 hover:bg-slate-800 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition shadow whitespace-nowrap">
+                <i class="fa-solid fa-clock mr-1.5"></i> 호출 예약
+              </button>
+            </div>
           </div>
 
           <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-2xl space-y-2">
@@ -594,6 +600,22 @@
               <i class="fa-solid fa-bell"></i>
               <span>🔴 학급 전체 긴급 경보 발송</span>
             </button>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+              <input type="datetime-local" id="emergency-schedule-time" class="w-full border border-red-300 rounded-xl p-2 text-xs font-bold text-red-900 focus:ring-2 focus:ring-red-500 outline-none bg-white">
+              <button onclick="scheduleStudentCall(true)" class="bg-red-800 hover:bg-red-900 text-white font-extrabold px-3 py-2 rounded-xl text-xs transition shadow whitespace-nowrap">
+                <i class="fa-solid fa-clock mr-1"></i> 긴급 예약
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-extrabold text-slate-600"><i class="fa-solid fa-calendar-check mr-1.5"></i>예약 발송 현황</span>
+              <span class="text-[10px] text-slate-400">Firebase 실시간 예약</span>
+            </div>
+            <div id="scheduled-call-list" class="space-y-2">
+              <div class="text-xs text-slate-400 text-center py-2">예약된 호출이 없습니다.</div>
+            </div>
           </div>
         </div>
 
@@ -845,7 +867,9 @@
       isActive: false,
       timeLeft: 15.0,
       clicks: 0,
-      timerInterval: null
+      timerInterval: null,
+      clickTimes: [],
+      untrustedClicks: 0
     };
 
     // Firebase connection (the visible UI/design is unchanged)
@@ -870,6 +894,10 @@
     let audioContext = null;
     let currentOscillator = null;
     let callAlertRepeatTimer = null;
+    let scheduledCalls = {};
+    let scheduledCallTimers = new Map();
+    let scheduledCallRef = null;
+    let scheduledCallCallback = null;
 
     function getClassKey(name = state.className) {
       return name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
@@ -1071,6 +1099,7 @@
         const reactionScoreRef = firebaseDb.ref('common/reactionScores');
         const academicRef = firebaseDb.ref('common/academicSchedule');
         const eventRef = firebaseDb.ref(`events/${classKey}`);
+        scheduledCallRef = firebaseDb.ref(`scheduledCalls/${classKey}`);
 
         // First connection: Firebase wins if data already exists; otherwise seed it with this browser's local data.
         const [classSnap, mealSnap, scoreSnap, reactionScoreSnap] = await Promise.all([
@@ -1198,6 +1227,18 @@
         };
         academicRef.on('value', academicCallback, academicCancelCallback);
         firebaseActiveRefs.push({ ref: academicRef, eventType: 'value', callback: academicCallback });
+
+        scheduledCallCallback = snap => {
+          if (myGeneration !== firebaseSyncGeneration) return;
+          scheduledCalls = snap.val() || {};
+          renderScheduledCalls();
+          armScheduledCalls();
+        };
+        const scheduledCallCancelCallback = err => {
+          console.warn('예약 호출 실시간 동기화 오류:', err);
+        };
+        scheduledCallRef.on('value', scheduledCallCallback, scheduledCallCancelCallback);
+        firebaseActiveRefs.push({ ref: scheduledCallRef, eventType: 'value', callback: scheduledCallCallback });
 
         const eventQuery = eventRef.orderByChild('_ts').startAt(firebaseSessionStartedAt);
         const eventCallback = snap => {
@@ -1523,6 +1564,128 @@
       document.getElementById('call-reason').value = reason;
     }
 
+    function getScheduledCallPayload(isEmergency = false) {
+      const timeInput = document.getElementById(isEmergency ? 'emergency-schedule-time' : 'call-schedule-time');
+      const scheduledAt = timeInput && timeInput.value ? new Date(timeInput.value).getTime() : NaN;
+      const target = isEmergency ? `🚨 [${state.className}] 전체 긴급 수신` : (document.getElementById('call-target').value || "전체 학생");
+      const reason = isEmergency ? (document.getElementById('emergency-reason').value || "즉시 선생님을 주시하세요!") : (document.getElementById('call-reason').value || "선생님 호출입니다.");
+      return { scheduledAt, target, reason, isEmergency };
+    }
+
+    async function scheduleStudentCall(isEmergency = false) {
+      const payload = getScheduledCallPayload(isEmergency);
+      if (!Number.isFinite(payload.scheduledAt) || payload.scheduledAt <= Date.now() + 5000) {
+        showToast('현재보다 최소 5초 이후의 예약 시각을 선택해주세요.', true);
+        return;
+      }
+      try {
+        if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+        const classKey = getClassKey();
+        const ref = firebaseDb.ref(`scheduledCalls/${classKey}`).push();
+        await ref.set({
+          ...payload,
+          className: state.className,
+          status: 'pending',
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          createdBy: clientId
+        });
+        const input = document.getElementById(isEmergency ? 'emergency-schedule-time' : 'call-schedule-time');
+        if (input) input.value = '';
+        showToast(`${isEmergency ? '긴급 경보' : '학생 호출'} 예약이 저장되었습니다. ⏰`);
+      } catch (err) {
+        console.error('예약 저장 실패:', err);
+        showToast('Firebase 예약 저장에 실패했습니다.', true);
+      }
+    }
+
+    async function cancelScheduledCall(id) {
+      try {
+        await firebaseDb.ref(`scheduledCalls/${getClassKey()}/${id}`).remove();
+        showToast('예약 발송을 취소했습니다.');
+      } catch (err) {
+        console.error('예약 취소 실패:', err);
+        showToast('예약 취소에 실패했습니다.', true);
+      }
+    }
+
+    function renderScheduledCalls() {
+      const box = document.getElementById('scheduled-call-list');
+      if (!box) return;
+      const entries = Object.entries(scheduledCalls || {})
+        .filter(([, item]) => item && item.status !== 'done' && Number(item.scheduledAt) > Date.now() - 60000)
+        .sort((a,b) => Number(a[1].scheduledAt) - Number(b[1].scheduledAt));
+      if (!entries.length) {
+        box.innerHTML = '<div class="text-xs text-slate-400 text-center py-2">예약된 호출이 없습니다.</div>';
+        return;
+      }
+      box.innerHTML = entries.map(([id,item]) => {
+        const d = new Date(Number(item.scheduledAt));
+        const when = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const label = item.isEmergency ? '🚨 긴급 경보' : '📣 학생 호출';
+        return `<div class="flex items-center gap-2 p-2.5 rounded-xl border ${item.isEmergency ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}">
+          <div class="flex-1 min-w-0">
+            <div class="text-[11px] font-black ${item.isEmergency ? 'text-red-700' : 'text-slate-700'}">${label} · ${when}</div>
+            <div class="text-[10px] text-slate-500 truncate">${escapeHtml(item.target || '')} · ${escapeHtml(item.reason || '')}</div>
+          </div>
+          <button onclick="cancelScheduledCall('${id}')" class="text-[10px] font-bold text-rose-600 hover:text-rose-800 px-2 py-1">취소</button>
+        </div>`;
+      }).join('');
+    }
+
+    function clearScheduledCallTimers() {
+      scheduledCallTimers.forEach(timer => clearTimeout(timer));
+      scheduledCallTimers.clear();
+    }
+
+    function armScheduledCalls() {
+      clearScheduledCallTimers();
+      const now = Date.now();
+      Object.entries(scheduledCalls || {}).forEach(([id, item]) => {
+        if (!item || item.status === 'done') return;
+        const due = Number(item.scheduledAt);
+        if (!Number.isFinite(due)) return;
+        const delay = due - now;
+        if (delay < -60000) return;
+        const timer = setTimeout(() => executeScheduledCall(id), Math.max(0, delay));
+        scheduledCallTimers.set(id, timer);
+      });
+    }
+
+    async function executeScheduledCall(id) {
+      const classKey = getClassKey();
+      const claimRef = firebaseDb.ref(`scheduledCalls/${classKey}/${id}/status`);
+      try {
+        const result = await claimRef.transaction(current => current === 'pending' ? `firing:${clientId}` : undefined);
+        if (!result.committed) return;
+
+        const itemSnap = await firebaseDb.ref(`scheduledCalls/${classKey}/${id}`).once('value');
+        const item = itemSnap.val();
+        if (!item) return;
+
+        // 예약 시각에 살아 있는 학급 클라이언트 중 단 한 대만 Firebase 이벤트를 발행한다.
+        await firebaseDb.ref(`events/${classKey}`).push({
+          type: 'CALL_SIGNAL',
+          target: item.target,
+          reason: item.reason,
+          isEmergency: !!item.isEmergency,
+          senderId: `scheduled:${id}`,
+          _id: `scheduled_${id}_${Date.now()}`,
+          _ts: firebase.database.ServerValue.TIMESTAMP
+        });
+        await firebaseDb.ref(`scheduledCalls/${classKey}/${id}`).update({
+          status: 'done',
+          firedAt: firebase.database.ServerValue.TIMESTAMP,
+          firedBy: clientId
+        });
+      } catch (err) {
+        console.error('예약 호출 실행 실패:', err);
+        try {
+          const snap = await claimRef.once('value');
+          if (String(snap.val() || '').startsWith('firing:')) await claimRef.set('pending');
+        } catch (_) {}
+      }
+    }
+
     function sendStudentCall(isEmergency = false) {
       const target = isEmergency ? `🚨 [${state.className}] 전체 긴급 수신` : (document.getElementById('call-target').value || "전체 학생");
       const reason = isEmergency ? (document.getElementById('emergency-reason').value || "즉시 선생님을 주시하세요!") : (document.getElementById('call-reason').value || "선생님 호출입니다.");
@@ -1595,7 +1758,7 @@
       showToast("선생님께 마음이 성공적으로 전달되었습니다! 💌");
     }
 
-    function handleClickRaceBtn() {
+    function handleClickRaceBtn(event) {
       initAudioContextOnGesture();
 
       if (!raceState.isActive && raceState.timeLeft === 15.0) {
@@ -1608,6 +1771,8 @@
         raceState.isActive = true;
         raceState.clicks = 0;
         raceState.timeLeft = 15.0;
+        raceState.clickTimes = [];
+        raceState.untrustedClicks = 0;
 
         document.getElementById('clickrace-status-badge').className = "text-xs bg-rose-100 text-rose-700 px-2.5 py-1 rounded-lg font-bold animate-pulse";
         document.getElementById('clickrace-status-badge').innerText = "🔥 광클 진행 중!";
@@ -1626,9 +1791,49 @@
 
       } else if (raceState.isActive) {
         raceState.clicks++;
+        raceState.clickTimes.push(performance.now());
+        if (event && event.isTrusted === false) raceState.untrustedClicks++;
         document.getElementById('clickrace-counter').innerText = raceState.clicks;
         playSubtleClickSound();
       }
+    }
+
+    function analyzeClickRacePattern() {
+      const times = Array.isArray(raceState.clickTimes) ? raceState.clickTimes : [];
+      const clicks = raceState.clicks || 0;
+      const cps = clicks / 15;
+
+      if (raceState.untrustedClicks > 0) {
+        return { suspicious: true, reason: '프로그램 생성 클릭 감지' };
+      }
+
+      // 인간의 지속 입력 범위를 크게 벗어나는 경우만 강제 차단한다.
+      if (cps > 18) {
+        return { suspicious: true, reason: `비정상적으로 높은 클릭 속도(${cps.toFixed(1)} CPS)` };
+      }
+
+      if (times.length < 30) return { suspicious: false, reason: '' };
+
+      const intervals = [];
+      for (let i = 1; i < times.length; i++) intervals.push(times[i] - times[i - 1]);
+      if (intervals.length < 20) return { suspicious: false, reason: '' };
+
+      const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const variance = intervals.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / intervals.length;
+      const stdDev = Math.sqrt(variance);
+      const cv = mean > 0 ? stdDev / mean : 0;
+      const ultraFastCount = intervals.filter(v => v < 25).length;
+
+      // 오토클리커 특유의 '지나치게 일정한 간격'은 빠른 기록일 때만 판정하여
+      // 정상 학생의 연타를 최대한 오탐하지 않도록 한다.
+      if (clicks >= 60 && mean < 180 && cv < 0.06) {
+        return { suspicious: true, reason: '클릭 간격이 지나치게 일정함' };
+      }
+      if (ultraFastCount >= 8) {
+        return { suspicious: true, reason: '비정상적인 초고속 연속 클릭 감지' };
+      }
+
+      return { suspicious: false, reason: '' };
     }
 
     function endClickRace() {
@@ -1662,6 +1867,14 @@
         clicks: finalClicks,
         date: dateStr
       };
+
+      const clickPatternCheck = analyzeClickRacePattern();
+      if (clickPatternCheck.suspicious) {
+        document.getElementById('clickrace-status-badge').className = "text-xs bg-rose-100 text-rose-700 px-2.5 py-1 rounded-lg font-bold";
+        document.getElementById('clickrace-status-badge').innerText = "기록 검증 제외";
+        showToast(`⚠️ ${finalClicks}회 기록은 명예의 전당에 등록되지 않습니다. (${clickPatternCheck.reason})`, true);
+        return;
+      }
 
       // 화면에는 즉시 반영하되, 서버 저장은 현재 Firebase 목록을 기준으로 transaction 처리한다.
       // 따라서 초기화 전의 오래된 localStorage 목록 전체가 다시 DB로 올라갈 수 없다.
@@ -2783,6 +2996,19 @@
       resetClassroomInactivityTimer();
     }
 
+    let academicMidnightRefreshTimer = null;
+
+    function scheduleAcademicMidnightRefresh() {
+      if (academicMidnightRefreshTimer) clearTimeout(academicMidnightRefreshTimer);
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1, 0);
+      academicMidnightRefreshTimer = setTimeout(() => {
+        renderAcademicSchedule();
+        renderTodos();
+        scheduleAcademicMidnightRefresh();
+      }, Math.max(1000, nextMidnight.getTime() - now.getTime()));
+    }
+
     let classroomClockMode = 'digital';
 
     function buildAnalogClockMarks() {
@@ -3086,6 +3312,7 @@
       updateClassroomClock();
       setInterval(updateClassroomClock, 250);
       initClassroomInactivityWatch();
+      scheduleAcademicMidnightRefresh();
 
       initAutoSyncSystem();
 
