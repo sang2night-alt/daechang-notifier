@@ -1073,8 +1073,8 @@
         const eventRef = firebaseDb.ref(`events/${classKey}`);
 
         // First connection: Firebase wins if data already exists; otherwise seed it with this browser's local data.
-        const [classSnap, mealSnap, scoreSnap, reactionScoreSnap, academicSnap] = await Promise.all([
-          classRef.once('value'), mealRef.once('value'), scoreRef.once('value'), reactionScoreRef.once('value'), academicRef.once('value')
+        const [classSnap, mealSnap, scoreSnap, reactionScoreSnap] = await Promise.all([
+          classRef.once('value'), mealRef.once('value'), scoreRef.once('value'), reactionScoreRef.once('value')
         ]);
         if (myGeneration !== firebaseSyncGeneration) return;
 
@@ -1099,11 +1099,22 @@
           await writeClassStateToFirebase();
         }
 
-        if (academicSnap.exists()) {
-          state.academicSchedule = normalizeAcademicSchedule(academicSnap.val());
-          localStorage.setItem('daechang_shared_academic_schedule', JSON.stringify(state.academicSchedule));
-        } else {
-          await academicRef.set(state.academicSchedule || []);
+        try {
+          const academicSnap = await academicRef.once('value');
+          if (academicSnap.exists()) {
+            state.academicSchedule = normalizeAcademicSchedule(academicSnap.val());
+            localStorage.setItem('daechang_shared_academic_schedule', JSON.stringify(state.academicSchedule));
+          } else {
+            await academicRef.set(state.academicSchedule || []);
+          }
+        } catch (academicErr) {
+          console.warn('학사일정 Firebase 경로 접근 실패(기존 Firebase 연결은 유지):', academicErr);
+          try {
+            const cachedAcademic = JSON.parse(localStorage.getItem('daechang_shared_academic_schedule') || '[]');
+            state.academicSchedule = normalizeAcademicSchedule(cachedAcademic);
+          } catch (_) {
+            state.academicSchedule = state.academicSchedule || [];
+          }
         }
 
         if (mealSnap.exists()) {
@@ -1175,13 +1186,18 @@
         trackFirebaseListener(reactionScoreRef, 'value', reactionScoreCallback);
 
         // Event channel is used only for transient calls/test signals. Old events are never replayed as new alerts.
-        attachFirebaseListener(academicRef, 'value', snap => {
+        const academicCallback = snap => {
           if (myGeneration !== firebaseSyncGeneration) return;
           state.academicSchedule = normalizeAcademicSchedule(snap.val());
           localStorage.setItem('daechang_shared_academic_schedule', JSON.stringify(state.academicSchedule));
           renderAcademicSchedule();
           renderTodos();
-        });
+        };
+        const academicCancelCallback = err => {
+          console.warn('학사일정 실시간 동기화 권한 오류(기존 Firebase 연결은 유지):', err);
+        };
+        academicRef.on('value', academicCallback, academicCancelCallback);
+        firebaseListeners.push({ ref: academicRef, eventType: 'value', callback: academicCallback });
 
         const eventQuery = eventRef.orderByChild('_ts').startAt(firebaseSessionStartedAt);
         const eventCallback = snap => {
