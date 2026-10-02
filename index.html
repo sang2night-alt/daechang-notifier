@@ -481,6 +481,12 @@
               <div class="dday-progress" aria-hidden="true"><span id="dday-progress-bar" style="width:0%"></span></div>
             </div>
 
+            <div id="clock-class-message-wrap" class="w-full mt-4 h-32 sm:h-[150px] overflow-hidden rounded-2xl bg-slate-100 border-2 border-slate-300 shadow-sm hidden flex items-center">
+              <div class="w-full min-h-[96px] sm:min-h-[120px] overflow-hidden py-5 sm:py-7 flex items-center">
+                <div id="clock-class-message" class="whitespace-nowrap text-6xl sm:text-8xl font-black text-black leading-none" style="width:max-content; animation: clock-message-scroll 18s linear infinite;"></div>
+              </div>
+            </div>
+
             <div class="dday-register">
               <form class="dday-form" onsubmit="addDday(event)">
                 <div>
@@ -498,14 +504,12 @@
               </div>
               <div id="dday-list" class="dday-list"></div>
             </div>
+
+
           </div>
         </div>
 
-        <div id="clock-class-message-wrap" class="w-full mt-4 h-32 sm:h-[150px] overflow-hidden rounded-2xl bg-slate-100 border-2 border-slate-300 shadow-sm hidden flex items-center">
-          <div class="w-full min-h-[96px] sm:min-h-[120px] overflow-hidden py-5 sm:py-7 flex items-center">
-            <div id="clock-class-message" class="whitespace-nowrap text-6xl sm:text-8xl font-black text-black leading-none" style="width:max-content; animation: clock-message-scroll 18s linear infinite;"></div>
-          </div>
-        </div>
+
       </div>
     </section>
 
