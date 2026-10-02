@@ -262,6 +262,20 @@
       .dday-number { font-size:clamp(4rem,22vw,6.2rem); }
     }
 
+
+    /* Click Race: lock touch scrolling only while the 15-second game is active */
+    html.clickrace-scroll-locked,
+    body.clickrace-scroll-locked {
+      overflow: hidden !important;
+      overscroll-behavior: none;
+    }
+    body.clickrace-scroll-locked #clickrace-btn {
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
 </style>
 
   <!-- PWA -->
@@ -1140,6 +1154,26 @@
       clickTimes: [],
       untrustedClicks: 0
     };
+
+    let clickRaceLockedScrollY = 0;
+
+    function lockClickRaceScroll() {
+      clickRaceLockedScrollY = window.scrollY || window.pageYOffset || 0;
+      document.documentElement.classList.add('clickrace-scroll-locked');
+      document.body.classList.add('clickrace-scroll-locked');
+    }
+
+    function unlockClickRaceScroll() {
+      document.documentElement.classList.remove('clickrace-scroll-locked');
+      document.body.classList.remove('clickrace-scroll-locked');
+      window.scrollTo(0, clickRaceLockedScrollY);
+    }
+
+    function preventClickRaceTouchScroll(event) {
+      if (!raceState.isActive) return;
+      if (event.cancelable) event.preventDefault();
+    }
+
 
     // Firebase connection (the visible UI/design is unchanged)
     const firebaseConfig = {
@@ -2059,6 +2093,7 @@
         raceState.timeLeft = 15.0;
         raceState.clickTimes = [];
         raceState.untrustedClicks = 0;
+        lockClickRaceScroll();
 
         document.getElementById('clickrace-status-badge').className = "text-xs bg-rose-100 text-rose-700 px-2.5 py-1 rounded-lg font-bold animate-pulse";
         document.getElementById('clickrace-status-badge').innerText = "🔥 광클 진행 중!";
@@ -2125,6 +2160,7 @@
     function endClickRace() {
       clearInterval(raceState.timerInterval);
       raceState.isActive = false;
+      unlockClickRaceScroll();
 
       const finalClicks = raceState.clicks;
       const nameInput = document.getElementById('clickrace-student-name').value.trim() || "익명";
@@ -3795,6 +3831,13 @@
         ddayDateInput.value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
       }
       renderDdays();
+
+      const clickRaceBtn = document.getElementById('clickrace-btn');
+      if (clickRaceBtn) {
+        clickRaceBtn.addEventListener('touchmove', preventClickRaceTouchScroll, { passive: false });
+      }
+      window.addEventListener('pagehide', unlockClickRaceScroll);
+
       initClassroomInactivityWatch();
       scheduleAcademicMidnightRefresh();
 
