@@ -216,6 +216,54 @@
       .original-digital-clock { font-size:clamp(3.5rem,16.2vw,5rem); letter-spacing:-.065em; }
     }
 
+
+    /* Clock mode layout: keep the marquee at the same vertical position in all 3 modes */
+    .clock-mode-stage {
+      width:100%;
+      min-height:330px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+    }
+    .clock-mode-stage #digital-clock-date { width:100%; }
+    @media (max-width:640px) {
+      .clock-mode-stage { min-height:250px; }
+    }
+
+    /* Multiple D-DAY cards: horizontal swipe/scroll with snap */
+    .dday-carousel {
+      width:100%;
+      display:flex;
+      overflow-x:auto;
+      overflow-y:hidden;
+      scroll-snap-type:x mandatory;
+      scroll-behavior:smooth;
+      overscroll-behavior-x:contain;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+      border-radius:1.75rem;
+    }
+    .dday-carousel::-webkit-scrollbar { display:none; }
+    .dday-slide {
+      flex:0 0 100%;
+      width:100%;
+      scroll-snap-align:start;
+      scroll-snap-stop:always;
+    }
+    .dday-slide .dday-hero { min-height:290px; display:flex; flex-direction:column; justify-content:center; }
+    .dday-page-hint {
+      margin-top:.55rem;
+      font-size:.68rem;
+      font-weight:800;
+      color:#94a3b8;
+      letter-spacing:.01em;
+    }
+    @media (max-width:640px) {
+      .dday-carousel { border-radius:1.35rem; }
+      .dday-slide .dday-hero { min-height:220px; }
+    }
+
     /* D-DAY clock mode — scoped only to the clock tab */
     .dday-clock-panel { display:none; width:100%; max-width:980px; margin:0 auto; }
     .dday-clock-panel.active { display:block; }
@@ -477,22 +525,19 @@
             <button id="clock-style-flip-btn" class="clock-style-btn" onclick="setClockStyle('flip')"><i class="fa-solid fa-table-cells-large mr-1.5"></i>플립 시계</button>
             <button id="clock-style-dday-btn" class="clock-style-btn" onclick="setClockStyle('dday')"><i class="fa-solid fa-calendar-day mr-1.5"></i>D-DAY</button>
           </div>
-          <div id="original-clock-time" class="original-digital-clock hidden" aria-label="현재 시각">00:00:00</div>
-          <div id="digital-clock-time" class="flat-flip-clock" aria-label="현재 시각">
-            <div class="flat-flip-unit"><span id="flip-hour">00</span></div>
-            <span class="flat-flip-colon">:</span>
-            <div class="flat-flip-unit"><span id="flip-minute">00</span></div>
-            <span class="flat-flip-colon">:</span>
-            <div class="flat-flip-unit flat-flip-seconds"><span id="flip-second">00</span></div>
-          </div>
-          <div id="digital-clock-date" class="mt-5 sm:mt-7 text-2xl sm:text-4xl font-extrabold text-slate-600">----</div>
-          <div id="dday-clock-panel" class="dday-clock-panel" aria-label="D-DAY">
-            <div class="dday-hero">
-              <div class="dday-kicker"><i class="fa-solid fa-graduation-cap mr-2"></i>OUR CLASS D-DAY</div>
-              <div id="dday-hero-title" class="dday-title">시험 D-DAY를 등록해 보세요</div>
-              <div id="dday-hero-number" class="dday-number">D-DAY</div>
-              <div id="dday-hero-date" class="dday-date">다가오는 시험과 중요한 날을 함께 준비해요.</div>
-              <div class="dday-progress" aria-hidden="true"><span id="dday-progress-bar" style="width:0%"></span></div>
+          <div class="clock-mode-stage">
+            <div id="original-clock-time" class="original-digital-clock hidden" aria-label="현재 시각">00:00:00</div>
+            <div id="digital-clock-time" class="flat-flip-clock" aria-label="현재 시각">
+              <div class="flat-flip-unit"><span id="flip-hour">00</span></div>
+              <span class="flat-flip-colon">:</span>
+              <div class="flat-flip-unit"><span id="flip-minute">00</span></div>
+              <span class="flat-flip-colon">:</span>
+              <div class="flat-flip-unit flat-flip-seconds"><span id="flip-second">00</span></div>
+            </div>
+            <div id="digital-clock-date" class="mt-5 sm:mt-7 text-2xl sm:text-4xl font-extrabold text-slate-600">----</div>
+            <div id="dday-clock-panel" class="dday-clock-panel" aria-label="D-DAY">
+              <div id="dday-carousel" class="dday-carousel"></div>
+              <div id="dday-page-hint" class="dday-page-hint hidden">좌우로 밀어 다른 D-DAY 보기</div>
             </div>
           </div>
 
@@ -1071,6 +1116,14 @@
         <div class="text-xs font-black text-cyan-600 uppercase tracking-wider mb-1">반응속도 배틀 도전장</div>
         <h3 id="reaction-challenge-title" class="text-2xl font-black text-slate-800">다른 학급의 도전!</h3>
         <p id="reaction-challenge-text" class="text-sm font-bold text-slate-500 mt-2">도전장을 수락하시겠습니까?</p>
+      </div>
+      <div class="flex items-center justify-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-extrabold">
+          <i class="fa-regular fa-clock"></i>
+          <span>자동 만료</span>
+          <span id="reaction-challenge-countdown" class="text-base tabular-nums">10</span>
+          <span>초</span>
+        </div>
       </div>
       <div class="flex space-x-2">
         <button onclick="dismissReactionChallenge()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-sm">나중에</button>
@@ -2314,6 +2367,9 @@
     let pendingReactionChallenge = null;
     let reactionChallengeRef = null;
     let reactionChallengeCallback = null;
+    let reactionChallengeCountdownTimer = null;
+    let reactionChallengeExpireTimer = null;
+    let sentReactionChallengeExpireTimer = null;
 
     firebaseDb.ref('.info/serverTimeOffset').on('value', snap => {
       reactionServerOffset = Number(snap.val()) || 0;
@@ -2340,26 +2396,100 @@
       return firebaseAuth.currentUser;
     }
 
+    function clearReactionChallengeDisplayTimers() {
+      if (reactionChallengeCountdownTimer) clearInterval(reactionChallengeCountdownTimer);
+      if (reactionChallengeExpireTimer) clearTimeout(reactionChallengeExpireTimer);
+      reactionChallengeCountdownTimer = null;
+      reactionChallengeExpireTimer = null;
+    }
+
+    function getReactionChallengeExpiresAt(challenge) {
+      const explicit = Number(challenge && challenge.expiresAt);
+      if (Number.isFinite(explicit) && explicit > 0) return explicit;
+      const created = Number(challenge && challenge.createdAt);
+      return Number.isFinite(created) && created > 0 ? created + 10000 : 0;
+    }
+
+    async function expireReactionChallenge(roomId) {
+      if (!roomId) return;
+      try {
+        await firebaseDb.ref('reactionChallenge').transaction(current => {
+          if (!current || current.roomId !== roomId || current.status !== 'open') return current;
+          current.status = 'expired';
+          current.expiredAt = firebase.database.ServerValue.TIMESTAMP;
+          return current;
+        });
+      } catch (e) {
+        console.warn('Reaction challenge expiry update failed:', e);
+      }
+    }
+
+    function startReactionChallengeCountdown(challenge) {
+      clearReactionChallengeDisplayTimers();
+      const countdown = document.getElementById('reaction-challenge-countdown');
+      const expiresAt = getReactionChallengeExpiresAt(challenge);
+      if (!expiresAt) return;
+
+      const update = () => {
+        const remainingMs = expiresAt - reactionServerNow();
+        const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
+        if (countdown) countdown.innerText = String(seconds);
+        if (remainingMs <= 0) {
+          clearReactionChallengeDisplayTimers();
+          hideReactionChallengeModal();
+          if (pendingReactionChallenge && pendingReactionChallenge.roomId === challenge.roomId) {
+            pendingReactionChallenge = null;
+          }
+          expireReactionChallenge(challenge.roomId);
+        }
+      };
+
+      update();
+      reactionChallengeCountdownTimer = setInterval(update, 250);
+      reactionChallengeExpireTimer = setTimeout(update, Math.max(0, expiresAt - reactionServerNow()) + 50);
+    }
+
     function initReactionChallengeListener() {
       if (reactionChallengeRef && reactionChallengeCallback) reactionChallengeRef.off('value', reactionChallengeCallback);
       reactionChallengeRef = firebaseDb.ref('reactionChallenge');
       reactionChallengeCallback = snap => {
         const challenge = snap.val();
-        if (!challenge || challenge.status !== 'open') { hideReactionChallengeModal(); return; }
-        const age = reactionServerNow() - Number(challenge.createdAt || 0);
-        if (age > 60000 || challenge.senderId === clientId || challenge.fromClass === state.className || reactionRoomCode) return;
+        if (!challenge || challenge.status !== 'open') {
+          hideReactionChallengeModal();
+          pendingReactionChallenge = null;
+          return;
+        }
+
+        const expiresAt = getReactionChallengeExpiresAt(challenge);
+        const remaining = expiresAt - reactionServerNow();
+
+        // 10초가 지난 도전장은 어떤 기기에서도 다시 띄우지 않는다.
+        if (!expiresAt || remaining <= 0) {
+          hideReactionChallengeModal();
+          pendingReactionChallenge = null;
+          expireReactionChallenge(challenge.roomId);
+          return;
+        }
+
+        if (challenge.senderId === clientId || challenge.fromClass === state.className || reactionRoomCode) {
+          hideReactionChallengeModal();
+          return;
+        }
+
         pendingReactionChallenge = challenge;
         const title = document.getElementById('reaction-challenge-title');
         const text = document.getElementById('reaction-challenge-text');
         if (title) title.innerText = `${challenge.fromClass}의 도전!`;
-        if (text) text.innerText = `${challenge.fromClass}에서 반응속도 배틀 도전장을 보냈습니다. 수락하면 자동으로 연결됩니다.`;
+        if (text) text.innerText = `${challenge.fromClass}에서 반응속도 배틀 도전장을 보냈습니다. 10초 안에 수락하면 자동으로 연결됩니다.`;
         const modal = document.getElementById('reaction-challenge-modal');
         if (modal) modal.classList.remove('hidden');
+        startReactionChallengeCountdown(challenge);
       };
       reactionChallengeRef.on('value', reactionChallengeCallback);
     }
 
     function hideReactionChallengeModal() {
+      clearReactionChallengeDisplayTimers();
       const modal = document.getElementById('reaction-challenge-modal');
       if (modal) modal.classList.add('hidden');
     }
@@ -2456,20 +2586,65 @@
     async function createReactionRoom() {
       if (soloReactionActive) { soloReactionActive = false; clearSoloReactionTimers(); }
       if (reactionRoomCode) return showToast('이미 대전방에 연결되어 있습니다.', true);
+      if (sentReactionChallengeExpireTimer) {
+        clearTimeout(sentReactionChallengeExpireTimer);
+        sentReactionChallengeExpireTimer = null;
+      }
+
       try {
         const user = await ensureReactionAuth();
         const roomId = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
         const roomRef = firebaseDb.ref(`reactionRooms/${roomId}`);
+        const expiresAt = reactionServerNow() + 10000;
+
         await roomRef.set({
           createdAt: firebase.database.ServerValue.TIMESTAMP,
           status: 'waiting', round: 1,
           players: { p1: { uid:user.uid, className:state.className, ready:false, result:null } }
         });
         await enterReactionRoom(roomId, 'p1');
+
         await firebaseDb.ref('reactionChallenge').set({
-          roomId, fromClass:state.className, senderId:clientId, status:'open', createdAt:firebase.database.ServerValue.TIMESTAMP
+          roomId,
+          fromClass: state.className,
+          senderId: clientId,
+          status: 'open',
+          createdAt: firebase.database.ServerValue.TIMESTAMP,
+          expiresAt
         });
-        showToast(`⚔️ ${state.className}의 도전장을 모든 학급에 보냈습니다!`);
+
+        showToast(`⚔️ ${state.className}의 도전장을 보냈습니다! 10초 동안 수락을 기다립니다.`);
+
+        // 10초 안에 아무도 수락하지 않으면 도전장과 빈 대전방을 자동 정리한다.
+        sentReactionChallengeExpireTimer = setTimeout(async () => {
+          sentReactionChallengeExpireTimer = null;
+          try {
+            const challengeRef = firebaseDb.ref('reactionChallenge');
+            const result = await challengeRef.transaction(current => {
+              if (!current || current.roomId !== roomId || current.status !== 'open') return current;
+              current.status = 'expired';
+              current.expiredAt = firebase.database.ServerValue.TIMESTAMP;
+              return current;
+            });
+
+            const finalChallenge = result.snapshot ? result.snapshot.val() : null;
+            const expiredByThisTimer = !!(finalChallenge && finalChallenge.roomId === roomId && finalChallenge.status === 'expired');
+
+            if (expiredByThisTimer) {
+              await roomRef.transaction(room => {
+                if (!room || room.status !== 'waiting' || (room.players && room.players.p2)) return room;
+                return null;
+              });
+
+              if (reactionRoomCode === roomId && reactionPlayerSlot === 'p1') {
+                await leaveReactionRoom(false, false);
+                showToast('⏱️ 10초 동안 응답이 없어 도전장이 자동 취소되었습니다.', true);
+              }
+            }
+          } catch (e) {
+            console.warn('Reaction challenge auto expiry failed:', e);
+          }
+        }, Math.max(0, expiresAt - reactionServerNow()) + 100);
       } catch(e) {
         console.error('Reaction challenge create failed:', e);
         showToast('도전장 발송 중 오류가 발생했습니다.', true);
@@ -2479,6 +2654,14 @@
     async function acceptReactionChallenge() {
       const challenge = pendingReactionChallenge;
       if (!challenge || !challenge.roomId) return hideReactionChallengeModal();
+
+      const expiresAt = getReactionChallengeExpiresAt(challenge);
+      if (!expiresAt || reactionServerNow() >= expiresAt) {
+        hideReactionChallengeModal();
+        pendingReactionChallenge = null;
+        expireReactionChallenge(challenge.roomId);
+        return showToast('도전장 수락 시간이 만료되었습니다.', true);
+      }
 
       const btn = document.getElementById('reaction-challenge-accept-btn');
       if (btn) btn.disabled = true;
@@ -2588,6 +2771,10 @@
 
         hideReactionChallengeModal();
         pendingReactionChallenge = null;
+        if (sentReactionChallengeExpireTimer) {
+          clearTimeout(sentReactionChallengeExpireTimer);
+          sentReactionChallengeExpireTimer = null;
+        }
 
         switchTab('gamecenter');
         switchGameCenter('reaction');
@@ -2614,6 +2801,10 @@
     async function leaveReactionRoom(showMessage=true, cancelChallenge=true) {
       const oldCode=reactionRoomCode; const oldSlot=reactionPlayerSlot;
       clearReactionTimers();
+      if (sentReactionChallengeExpireTimer) {
+        clearTimeout(sentReactionChallengeExpireTimer);
+        sentReactionChallengeExpireTimer = null;
+      }
       if(reactionRoomRef && reactionRoomCallback) reactionRoomRef.off('value',reactionRoomCallback);
       reactionRoomCallback=null; reactionRoomRef=null; reactionRoomCode=null; reactionPlayerSlot=null; reactionLastRoom=null;
       if(cancelChallenge && oldCode && oldSlot==='p1') {
@@ -3448,55 +3639,92 @@
       return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
     }
 
+    let ddayReturnTimer = null;
+
+    function scheduleDdayReturnToFirst() {
+      clearTimeout(ddayReturnTimer);
+      const carousel = document.getElementById('dday-carousel');
+      if (!carousel) return;
+      ddayReturnTimer = setTimeout(() => {
+        if (document.getElementById('dday-clock-panel')?.classList.contains('active')) {
+          carousel.scrollTo({ left: 0, behavior: 'smooth' });
+        }
+      }, 30000);
+    }
+
+    function handleDdayCarouselActivity() {
+      scheduleDdayReturnToFirst();
+    }
+
+    function scrollToDdayIndex(index) {
+      const carousel = document.getElementById('dday-carousel');
+      if (!carousel) return;
+      const width = carousel.clientWidth || 1;
+      carousel.scrollTo({ left: Math.max(0, index) * width, behavior: 'smooth' });
+      scheduleDdayReturnToFirst();
+    }
+
     function renderDdays() {
       const list = document.getElementById('dday-list');
-      const title = document.getElementById('dday-hero-title');
-      const number = document.getElementById('dday-hero-number');
-      const date = document.getElementById('dday-hero-date');
-      const progress = document.getElementById('dday-progress-bar');
-      if (!list || !title || !number || !date || !progress) return;
+      const carousel = document.getElementById('dday-carousel');
+      const hint = document.getElementById('dday-page-hint');
+      if (!list || !carousel) return;
 
       const items = getSortedDdays();
-      const primary = items.find(item => calendarDayDiff(item.date) >= 0) || items[0];
 
-      if (!primary) {
-        title.textContent = '시험 D-DAY를 등록해 보세요';
-        number.textContent = 'D-DAY';
-        number.classList.remove('today');
-        date.textContent = '다가오는 시험과 중요한 날을 함께 준비해요.';
-        progress.style.width = '0%';
+      if (!items.length) {
+        carousel.innerHTML = `<div class="dday-slide">
+          <div class="dday-hero">
+            <div class="dday-kicker"><i class="fa-solid fa-graduation-cap mr-2"></i>OUR CLASS D-DAY</div>
+            <div class="dday-title">시험 D-DAY를 등록해 보세요</div>
+            <div class="dday-number">D-DAY</div>
+            <div class="dday-date">다가오는 시험과 중요한 날을 함께 준비해요.</div>
+            <div class="dday-progress" aria-hidden="true"><span style="width:0%"></span></div>
+          </div>
+        </div>`;
+        if (hint) hint.classList.add('hidden');
         list.innerHTML = '<div class="dday-empty"><i class="fa-regular fa-calendar-plus mr-1.5"></i>아직 등록된 D-DAY가 없습니다.</div>';
+        clearTimeout(ddayReturnTimer);
         return;
       }
 
-      const diff = calendarDayDiff(primary.date);
-      title.textContent = primary.title;
-      number.textContent = ddayLabel(diff);
-      number.classList.toggle('today', diff === 0);
-      date.textContent = formatDdayDate(primary.date);
+      carousel.innerHTML = items.map(item => {
+        const diff = calendarDayDiff(item.date);
+        const created = item.createdAt ? new Date(item.createdAt) : new Date();
+        const target = parseDateOnly(item.date);
+        const total = Math.max(1, Math.ceil((target - created) / 86400000));
+        const elapsed = Math.max(0, total - Math.max(0, diff));
+        const progress = Math.min(100, Math.max(4, (elapsed / total) * 100));
+        return `<div class="dday-slide">
+          <div class="dday-hero">
+            <div class="dday-kicker"><i class="fa-solid fa-graduation-cap mr-2"></i>OUR CLASS D-DAY</div>
+            <div class="dday-title">${escapeHtml(item.title)}</div>
+            <div class="dday-number${diff === 0 ? ' today' : ''}">${escapeHtml(ddayLabel(diff))}</div>
+            <div class="dday-date">${escapeHtml(formatDdayDate(item.date))}</div>
+            <div class="dday-progress" aria-hidden="true"><span style="width:${progress}%"></span></div>
+          </div>
+        </div>`;
+      }).join('');
 
-      const created = primary.createdAt ? new Date(primary.createdAt) : new Date();
-      const target = parseDateOnly(primary.date);
-      const total = Math.max(1, Math.ceil((target - created) / 86400000));
-      const elapsed = Math.max(0, total - Math.max(0, diff));
-      progress.style.width = `${Math.min(100, Math.max(4, (elapsed / total) * 100))}%`;
+      carousel.scrollLeft = 0;
+      if (hint) hint.classList.toggle('hidden', items.length <= 1);
 
-      list.innerHTML = items.slice(0, 8).map(item => {
+      list.innerHTML = items.slice(0, 8).map((item, index) => {
         const itemDiff = calendarDayDiff(item.date);
-        const active = item.id === primary.id ? ' active' : '';
-        return `<div class="dday-item${active}">
+        return `<div class="dday-item" onclick="scrollToDdayIndex(${index})" style="cursor:pointer">
           <div class="dday-item-main">
             <div class="dday-item-title">${escapeHtml(item.title)}</div>
             <div class="dday-item-date">${escapeHtml(formatDdayDate(item.date))}</div>
           </div>
           <span class="dday-item-badge">${escapeHtml(ddayLabel(itemDiff))}</span>
-          <button type="button" class="dday-item-delete" onclick="deleteDday('${item.id}')" title="D-DAY 삭제" aria-label="${escapeHtml(item.title)} 삭제">
+          <button type="button" class="dday-item-delete" onclick="event.stopPropagation(); deleteDday('${item.id}')" title="D-DAY 삭제" aria-label="${escapeHtml(item.title)} 삭제">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>`;
       }).join('');
-    }
 
+      if (items.length > 1) scheduleDdayReturnToFirst();
+    }
 
     async function addDday(event) {
       if (event) event.preventDefault();
@@ -3566,7 +3794,12 @@
       if (flipBtn) flipBtn.classList.toggle('active', chosen === 'flip');
       if (ddayBtn) ddayBtn.classList.toggle('active', chosen === 'dday');
 
-      if (chosen === 'dday') renderDdays();
+      if (chosen === 'dday') {
+        renderDdays();
+        scheduleDdayReturnToFirst();
+      } else {
+        clearTimeout(ddayReturnTimer);
+      }
       if (persist) { try { localStorage.setItem('smartClassroomClockStyle', chosen); } catch (e) {} }
     }
 
@@ -3831,6 +4064,13 @@
         ddayDateInput.value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
       }
       renderDdays();
+
+      const ddayCarousel = document.getElementById('dday-carousel');
+      if (ddayCarousel) {
+        ['scroll', 'touchstart', 'touchend', 'pointerdown'].forEach(type => {
+          ddayCarousel.addEventListener(type, handleDdayCarouselActivity, { passive: true });
+        });
+      }
 
       const clickRaceBtn = document.getElementById('clickrace-btn');
       if (clickRaceBtn) {
