@@ -480,13 +480,17 @@
               <div id="dday-hero-date" class="dday-date">다가오는 시험과 중요한 날을 함께 준비해요.</div>
               <div class="dday-progress" aria-hidden="true"><span id="dday-progress-bar" style="width:0%"></span></div>
             </div>
+          </div>
 
-            <div id="clock-class-message-wrap" class="w-full mt-4 h-32 sm:h-[150px] overflow-hidden rounded-2xl bg-slate-100 border-2 border-slate-300 shadow-sm hidden flex items-center">
-              <div class="w-full min-h-[96px] sm:min-h-[120px] overflow-hidden py-5 sm:py-7 flex items-center">
-                <div id="clock-class-message" class="whitespace-nowrap text-6xl sm:text-8xl font-black text-black leading-none" style="width:max-content; animation: clock-message-scroll 18s linear infinite;"></div>
-              </div>
+          <!-- Shared marquee: visible in original, flip and D-DAY clock modes -->
+          <div id="clock-class-message-wrap" class="w-full mt-4 h-32 sm:h-[150px] overflow-hidden rounded-2xl bg-slate-100 border-2 border-slate-300 shadow-sm hidden flex items-center">
+            <div class="w-full min-h-[96px] sm:min-h-[120px] overflow-hidden py-5 sm:py-7 flex items-center">
+              <div id="clock-class-message" class="whitespace-nowrap text-6xl sm:text-8xl font-black text-black leading-none" style="width:max-content; animation: clock-message-scroll 18s linear infinite;"></div>
             </div>
+          </div>
 
+          <!-- D-DAY registration stays below the shared marquee and is shown only in D-DAY mode -->
+          <div id="dday-register-panel" class="dday-clock-panel">
             <div class="dday-register">
               <form class="dday-form" onsubmit="addDday(event)">
                 <div>
@@ -504,8 +508,6 @@
               </div>
               <div id="dday-list" class="dday-list"></div>
             </div>
-
-
           </div>
         </div>
 
@@ -3513,6 +3515,7 @@
       const flip = document.getElementById('digital-clock-time');
       const date = document.getElementById('digital-clock-date');
       const dday = document.getElementById('dday-clock-panel');
+      const ddayRegister = document.getElementById('dday-register-panel');
       const originalBtn = document.getElementById('clock-style-original-btn');
       const flipBtn = document.getElementById('clock-style-flip-btn');
       const ddayBtn = document.getElementById('clock-style-dday-btn');
@@ -3521,6 +3524,7 @@
       if (flip) flip.classList.toggle('hidden', chosen !== 'flip');
       if (date) date.classList.toggle('hidden', chosen === 'dday');
       if (dday) dday.classList.toggle('active', chosen === 'dday');
+      if (ddayRegister) ddayRegister.classList.toggle('active', chosen === 'dday');
 
       if (originalBtn) originalBtn.classList.toggle('active', chosen === 'original');
       if (flipBtn) flipBtn.classList.toggle('active', chosen === 'flip');
