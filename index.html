@@ -215,6 +215,53 @@
       .clock-style-switch { margin-bottom:1rem; }
       .original-digital-clock { font-size:clamp(3.5rem,16.2vw,5rem); letter-spacing:-.065em; }
     }
+
+    /* D-DAY clock mode — scoped only to the clock tab */
+    .dday-clock-panel { display:none; width:100%; max-width:980px; margin:0 auto; }
+    .dday-clock-panel.active { display:block; }
+    .dday-hero {
+      position:relative; overflow:hidden; border-radius:1.75rem; padding:2rem;
+      background:linear-gradient(135deg,#0f172a 0%,#1e293b 55%,#312e81 100%);
+      color:white; border:1px solid rgba(255,255,255,.09);
+    }
+    .dday-hero::after {
+      content:''; position:absolute; width:260px; height:260px; right:-90px; top:-120px;
+      border-radius:999px; background:rgba(129,140,248,.16); pointer-events:none;
+    }
+    .dday-kicker { font-size:.75rem; font-weight:900; letter-spacing:.14em; color:#c7d2fe; }
+    .dday-title { margin-top:.55rem; font-size:clamp(1.4rem,4vw,2.4rem); font-weight:900; letter-spacing:-.035em; }
+    .dday-number { margin-top:.35rem; font-size:clamp(4.5rem,15vw,9rem); line-height:.95; font-weight:900; letter-spacing:-.07em; font-variant-numeric:tabular-nums; }
+    .dday-number.today { font-size:clamp(3.7rem,12vw,7rem); letter-spacing:-.04em; }
+    .dday-date { margin-top:.8rem; font-size:.9rem; font-weight:800; color:#cbd5e1; }
+    .dday-progress { height:7px; border-radius:999px; background:rgba(255,255,255,.13); overflow:hidden; margin-top:1.4rem; }
+    .dday-progress > span { display:block; height:100%; border-radius:inherit; background:#a5b4fc; transition:width .35s ease; }
+    .dday-register {
+      margin-top:1rem; padding:1rem; border:1px solid #e2e8f0; border-radius:1.25rem; background:#f8fafc;
+    }
+    .dday-form { display:grid; grid-template-columns:minmax(0,1fr) 180px auto; gap:.55rem; align-items:end; }
+    .dday-form label { display:block; margin-bottom:.3rem; font-size:.7rem; font-weight:800; color:#64748b; }
+    .dday-form input { width:100%; min-width:0; border:1px solid #cbd5e1; border-radius:.8rem; background:white; padding:.7rem .8rem; font-size:.875rem; font-weight:700; outline:none; }
+    .dday-form input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.12); }
+    .dday-add-btn { min-height:42px; white-space:nowrap; border-radius:.8rem; background:#4f46e5; color:white; padding:.7rem 1rem; font-size:.8rem; font-weight:900; }
+    .dday-list { margin-top:.8rem; display:grid; gap:.45rem; }
+    .dday-item { display:flex; align-items:center; gap:.7rem; padding:.7rem .8rem; border:1px solid #e2e8f0; border-radius:.9rem; background:white; text-align:left; }
+    .dday-item-main { min-width:0; flex:1; }
+    .dday-item-title { font-size:.82rem; font-weight:900; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dday-item-date { margin-top:.1rem; font-size:.68rem; font-weight:700; color:#94a3b8; }
+    .dday-item-badge { flex:0 0 auto; font-size:.72rem; font-weight:900; color:#4338ca; background:#eef2ff; padding:.32rem .52rem; border-radius:.65rem; }
+    .dday-item.active { border-color:#a5b4fc; background:#eef2ff; }
+    .dday-item-delete { flex:0 0 auto; width:32px; height:32px; border-radius:.65rem; color:#94a3b8; }
+    .dday-item-delete:hover { background:#fff1f2; color:#e11d48; }
+    .dday-empty { padding:.9rem; text-align:center; font-size:.75rem; font-weight:700; color:#94a3b8; }
+    @media (max-width:640px) {
+      .clock-style-switch { flex-wrap:wrap; }
+      .dday-hero { padding:1.35rem 1rem; border-radius:1.35rem; }
+      .dday-form { grid-template-columns:1fr; }
+      .dday-add-btn { width:100%; }
+      .dday-register { padding:.85rem; }
+      .dday-number { font-size:clamp(4rem,22vw,6.2rem); }
+    }
+
 </style>
 
   <!-- PWA -->
@@ -414,6 +461,7 @@
           <div class="clock-style-switch" aria-label="시계 스타일 선택">
             <button id="clock-style-original-btn" class="clock-style-btn" onclick="setClockStyle('original')"><i class="fa-solid fa-clock mr-1.5"></i>기존 시계</button>
             <button id="clock-style-flip-btn" class="clock-style-btn" onclick="setClockStyle('flip')"><i class="fa-solid fa-table-cells-large mr-1.5"></i>플립 시계</button>
+            <button id="clock-style-dday-btn" class="clock-style-btn" onclick="setClockStyle('dday')"><i class="fa-solid fa-calendar-day mr-1.5"></i>D-DAY</button>
           </div>
           <div id="original-clock-time" class="original-digital-clock hidden" aria-label="현재 시각">00:00:00</div>
           <div id="digital-clock-time" class="flat-flip-clock" aria-label="현재 시각">
@@ -424,6 +472,33 @@
             <div class="flat-flip-unit flat-flip-seconds"><span id="flip-second">00</span></div>
           </div>
           <div id="digital-clock-date" class="mt-5 sm:mt-7 text-2xl sm:text-4xl font-extrabold text-slate-600">----</div>
+          <div id="dday-clock-panel" class="dday-clock-panel" aria-label="D-DAY">
+            <div class="dday-hero">
+              <div class="dday-kicker"><i class="fa-solid fa-graduation-cap mr-2"></i>OUR CLASS D-DAY</div>
+              <div id="dday-hero-title" class="dday-title">시험 D-DAY를 등록해 보세요</div>
+              <div id="dday-hero-number" class="dday-number">D-DAY</div>
+              <div id="dday-hero-date" class="dday-date">다가오는 시험과 중요한 날을 함께 준비해요.</div>
+              <div class="dday-progress" aria-hidden="true"><span id="dday-progress-bar" style="width:0%"></span></div>
+            </div>
+
+            <div class="dday-register">
+              <form class="dday-form" onsubmit="addDday(event)">
+                <div>
+                  <label for="dday-title-input">D-DAY 이름</label>
+                  <input id="dday-title-input" type="text" maxlength="40" autocomplete="off" placeholder="예: 2학기 기말고사">
+                </div>
+                <div>
+                  <label for="dday-date-input">날짜</label>
+                  <input id="dday-date-input" type="date">
+                </div>
+                <button type="submit" class="dday-add-btn"><i class="fa-solid fa-plus mr-1.5"></i>등록</button>
+              </form>
+              <div class="mt-2 text-[11px] font-semibold text-slate-400 text-left">
+                학생 누구나 이 학급의 D-DAY를 직접 등록할 수 있습니다. 등록된 일정은 학급 기기에서 실시간으로 공유됩니다.
+              </div>
+              <div id="dday-list" class="dday-list"></div>
+            </div>
+          </div>
         </div>
 
         <div id="clock-class-message-wrap" class="w-full mt-4 h-32 sm:h-[150px] overflow-hidden rounded-2xl bg-slate-100 border-2 border-slate-300 shadow-sm hidden flex items-center">
@@ -1086,6 +1161,8 @@
     let scheduledCallTimers = new Map();
     let scheduledCallRef = null;
     let scheduledCallCallback = null;
+    let ddayItems = {};
+    let ddayRef = null;
 
     function getClassKey(name = state.className) {
       return name.replace(/[^a-zA-Z0-9가-힣]/g, '_');
@@ -1288,6 +1365,7 @@
         const academicRef = firebaseDb.ref('common/academicSchedule');
         const eventRef = firebaseDb.ref(`events/${classKey}`);
         scheduledCallRef = firebaseDb.ref(`scheduledCalls/${classKey}`);
+        ddayRef = firebaseDb.ref(`ddays/${classKey}`);
 
         // First connection: Firebase wins if data already exists; otherwise seed it with this browser's local data.
         const [classSnap, mealSnap, scoreSnap, reactionScoreSnap] = await Promise.all([
@@ -1427,6 +1505,20 @@
         };
         scheduledCallRef.on('value', scheduledCallCallback, scheduledCallCancelCallback);
         firebaseActiveRefs.push({ ref: scheduledCallRef, eventType: 'value', callback: scheduledCallCallback });
+
+        const ddayCallback = snap => {
+          if (myGeneration !== firebaseSyncGeneration) return;
+          ddayItems = snap.val() || {};
+          try { localStorage.setItem(`daechang_ddays_${classKey}`, JSON.stringify(ddayItems)); } catch (_) {}
+          renderDdays();
+        };
+        const ddayCancelCallback = err => {
+          console.warn('D-DAY 실시간 동기화 오류:', err);
+          try { ddayItems = JSON.parse(localStorage.getItem(`daechang_ddays_${classKey}`) || '{}'); } catch (_) { ddayItems = {}; }
+          renderDdays();
+        };
+        ddayRef.on('value', ddayCallback, ddayCancelCallback);
+        firebaseActiveRefs.push({ ref: ddayRef, eventType: 'value', callback: ddayCallback });
 
         const eventQuery = eventRef.orderByChild('_ts').startAt(firebaseSessionStartedAt);
         const eventCallback = snap => {
@@ -3193,6 +3285,7 @@
       academicMidnightRefreshTimer = setTimeout(() => {
         renderAcademicSchedule();
         renderTodos();
+        renderDdays();
         scheduleAcademicMidnightRefresh();
       }, Math.max(1000, nextMidnight.getTime() - now.getTime()));
     }
@@ -3273,16 +3366,163 @@
     }
 
 
+
+    function parseDateOnly(value) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+      if (!m) return null;
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    }
+
+    function calendarDayDiff(targetValue) {
+      const target = parseDateOnly(targetValue);
+      if (!target) return null;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return Math.round((target - today) / 86400000);
+    }
+
+    function ddayLabel(diff) {
+      if (diff === null) return '-';
+      if (diff === 0) return 'D-DAY';
+      return diff > 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
+    }
+
+    function getSortedDdays() {
+      return Object.entries(ddayItems || {})
+        .map(([id, item]) => ({ id, ...(item || {}) }))
+        .filter(item => item.title && parseDateOnly(item.date))
+        .sort((a, b) => {
+          const da = calendarDayDiff(a.date), db = calendarDayDiff(b.date);
+          const aPast = da < 0, bPast = db < 0;
+          if (aPast !== bPast) return aPast ? 1 : -1;
+          return aPast ? db - da : da - db;
+        });
+    }
+
+    function formatDdayDate(value) {
+      const d = parseDateOnly(value);
+      if (!d) return '';
+      const days = ['일','월','화','수','목','금','토'];
+      return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+    }
+
+    function renderDdays() {
+      const list = document.getElementById('dday-list');
+      const title = document.getElementById('dday-hero-title');
+      const number = document.getElementById('dday-hero-number');
+      const date = document.getElementById('dday-hero-date');
+      const progress = document.getElementById('dday-progress-bar');
+      if (!list || !title || !number || !date || !progress) return;
+
+      const items = getSortedDdays();
+      const primary = items.find(item => calendarDayDiff(item.date) >= 0) || items[0];
+
+      if (!primary) {
+        title.textContent = '시험 D-DAY를 등록해 보세요';
+        number.textContent = 'D-DAY';
+        number.classList.remove('today');
+        date.textContent = '다가오는 시험과 중요한 날을 함께 준비해요.';
+        progress.style.width = '0%';
+        list.innerHTML = '<div class="dday-empty"><i class="fa-regular fa-calendar-plus mr-1.5"></i>아직 등록된 D-DAY가 없습니다.</div>';
+        return;
+      }
+
+      const diff = calendarDayDiff(primary.date);
+      title.textContent = primary.title;
+      number.textContent = ddayLabel(diff);
+      number.classList.toggle('today', diff === 0);
+      date.textContent = formatDdayDate(primary.date);
+
+      const created = primary.createdAt ? new Date(primary.createdAt) : new Date();
+      const target = parseDateOnly(primary.date);
+      const total = Math.max(1, Math.ceil((target - created) / 86400000));
+      const elapsed = Math.max(0, total - Math.max(0, diff));
+      progress.style.width = `${Math.min(100, Math.max(4, (elapsed / total) * 100))}%`;
+
+      list.innerHTML = items.slice(0, 8).map(item => {
+        const itemDiff = calendarDayDiff(item.date);
+        const active = item.id === primary.id ? ' active' : '';
+        return `<div class="dday-item${active}">
+          <div class="dday-item-main">
+            <div class="dday-item-title">${escapeHtml(item.title)}</div>
+            <div class="dday-item-date">${escapeHtml(formatDdayDate(item.date))}</div>
+          </div>
+          <span class="dday-item-badge">${escapeHtml(ddayLabel(itemDiff))}</span>
+          <button type="button" class="dday-item-delete" onclick="deleteDday('${item.id}')" title="D-DAY 삭제" aria-label="${escapeHtml(item.title)} 삭제">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>`;
+      }).join('');
+    }
+
+
+    async function addDday(event) {
+      if (event) event.preventDefault();
+      const titleInput = document.getElementById('dday-title-input');
+      const dateInput = document.getElementById('dday-date-input');
+      const title = (titleInput?.value || '').trim().slice(0, 40);
+      const date = dateInput?.value || '';
+
+      if (!title) return showToast('D-DAY 이름을 입력해주세요.', true);
+      if (!parseDateOnly(date)) return showToast('D-DAY 날짜를 선택해주세요.', true);
+      if (getSortedDdays().length >= 8) return showToast('D-DAY는 학급당 최대 8개까지 등록할 수 있습니다.', true);
+
+      const item = { title, date, createdAt: Date.now(), senderId: clientId };
+      try {
+        if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+        const ref = firebaseDb.ref(`ddays/${getClassKey()}`).push();
+        await ref.set(item);
+        if (titleInput) titleInput.value = '';
+        if (dateInput) dateInput.value = '';
+        showToast(`D-DAY [${title}]이(가) 등록되었습니다. 📅`);
+      } catch (e) {
+        console.error('D-DAY save failed:', e);
+        const id = 'local_' + Date.now();
+        ddayItems[id] = item;
+        try { localStorage.setItem(`daechang_ddays_${getClassKey()}`, JSON.stringify(ddayItems)); } catch (_) {}
+        renderDdays();
+        showToast('Firebase 연결이 없어 이 기기에 임시 저장했습니다.', true);
+      }
+    }
+
+    async function deleteDday(id) {
+      if (!id || !confirm('이 D-DAY를 삭제할까요?')) return;
+      try {
+        if (id.startsWith('local_')) {
+          delete ddayItems[id];
+          localStorage.setItem(`daechang_ddays_${getClassKey()}`, JSON.stringify(ddayItems));
+          renderDdays();
+        } else {
+          if (!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+          await firebaseDb.ref(`ddays/${getClassKey()}/${id}`).remove();
+        }
+        showToast('D-DAY를 삭제했습니다.');
+      } catch (e) {
+        console.error('D-DAY delete failed:', e);
+        showToast('D-DAY 삭제에 실패했습니다.', true);
+      }
+    }
+
     function setClockStyle(style, persist = true) {
-      const chosen = style === 'original' ? 'original' : 'flip';
+      const chosen = ['original', 'flip', 'dday'].includes(style) ? style : 'flip';
       const original = document.getElementById('original-clock-time');
       const flip = document.getElementById('digital-clock-time');
+      const date = document.getElementById('digital-clock-date');
+      const dday = document.getElementById('dday-clock-panel');
       const originalBtn = document.getElementById('clock-style-original-btn');
       const flipBtn = document.getElementById('clock-style-flip-btn');
+      const ddayBtn = document.getElementById('clock-style-dday-btn');
+
       if (original) original.classList.toggle('hidden', chosen !== 'original');
       if (flip) flip.classList.toggle('hidden', chosen !== 'flip');
+      if (date) date.classList.toggle('hidden', chosen === 'dday');
+      if (dday) dday.classList.toggle('active', chosen === 'dday');
+
       if (originalBtn) originalBtn.classList.toggle('active', chosen === 'original');
       if (flipBtn) flipBtn.classList.toggle('active', chosen === 'flip');
+      if (ddayBtn) ddayBtn.classList.toggle('active', chosen === 'dday');
+
+      if (chosen === 'dday') renderDdays();
       if (persist) { try { localStorage.setItem('smartClassroomClockStyle', chosen); } catch (e) {} }
     }
 
@@ -3420,6 +3660,8 @@
       localStorage.setItem('daechang_last_class', newClassName);
       loadStateLocally();
       state.className = newClassName;
+      try { ddayItems = JSON.parse(localStorage.getItem(`daechang_ddays_${getClassKey()}`) || '{}'); } catch (_) { ddayItems = {}; }
+      renderDdays();
       initAutoSyncSystem();
       renderAll();
       closeClassSelectModal();
@@ -3538,6 +3780,13 @@
       buildAnalogClockMarks();
       updateClassroomClock();
       setInterval(updateClassroomClock, 250);
+      try { ddayItems = JSON.parse(localStorage.getItem(`daechang_ddays_${getClassKey()}`) || '{}'); } catch (_) { ddayItems = {}; }
+      const ddayDateInput = document.getElementById('dday-date-input');
+      if (ddayDateInput && !ddayDateInput.value) {
+        const t = new Date();
+        ddayDateInput.value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+      }
+      renderDdays();
       initClassroomInactivityWatch();
       scheduleAcademicMidnightRefresh();
 
