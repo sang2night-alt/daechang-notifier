@@ -712,6 +712,7 @@
     <section id="view-gamecenter" class="hidden space-y-6">
       <div class="bg-white rounded-2xl p-2 shadow-sm border border-slate-200 flex flex-wrap gap-2">
         <button id="game-sub-btn-clickrace" onclick="switchGameCenter('clickrace')" class="flex-1 min-w-[150px] bg-amber-500 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-bolt mr-2"></i>광클 레이스</button>
+        <button id="game-sub-btn-memory" onclick="switchGameCenter('memory')" class="flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-brain mr-2"></i>기억력 카드 배틀</button>
         <button id="game-sub-btn-reaction" onclick="switchGameCenter('reaction')" class="flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-stopwatch mr-2"></i>반응속도 배틀</button>
       </div>
       <section id="game-view-clickrace" class="space-y-6">
@@ -883,6 +884,28 @@
       
     </section>
 
+      <!-- GAME: MEMORY MATCH (isolated from existing games) -->
+      <section id="game-view-memory" class="hidden space-y-5">
+        <div class="bg-gradient-to-r from-violet-600 to-indigo-700 text-white rounded-3xl p-5 sm:p-6 shadow-md">
+          <h2 class="text-xl sm:text-2xl font-black"><i class="fa-solid fa-brain mr-2"></i>기억력 카드 배틀</h2>
+          <p class="text-sm text-violet-100 mt-1">같은 그림 두 장을 찾아보세요! 보통(4×4)만 명예의 전당에 기록됩니다.</p>
+        </div>
+        <div class="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200 space-y-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="text-xs font-bold text-slate-600">난이도<select id="memory-difficulty" onchange="memoryNewGame()" class="block mt-1 border border-slate-300 rounded-xl p-2.5 font-bold text-sm"><option value="easy">쉬움 · 3×4</option><option value="normal" selected>보통 · 4×4 (공식)</option><option value="hard">어려움 · 4×5</option></select></label>
+            <button onclick="memoryNewGame()" class="bg-violet-600 text-white font-extrabold px-5 py-2.5 rounded-xl text-sm"><i class="fa-solid fa-rotate-right mr-1"></i>새 게임</button>
+            <div class="flex-1"></div>
+            <div class="text-sm font-bold text-slate-600">시간 <strong id="memory-time" class="text-lg text-violet-700 tabular-nums">0.0초</strong> · 시도 <strong id="memory-moves">0</strong>회 · <strong id="memory-pairs">0/8쌍</strong></div>
+          </div>
+          <p id="memory-status" role="status" aria-live="polite" class="text-sm font-bold text-slate-600">카드를 누르면 타이머가 시작됩니다.</p>
+          <div id="memory-board" class="grid grid-cols-4 gap-2 sm:gap-3 max-w-2xl mx-auto" aria-label="기억력 카드 게임판"></div>
+        </div>
+        <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="font-extrabold text-slate-800"><i class="fa-solid fa-trophy text-amber-500 mr-2"></i>기억력 게임 명예의 전당 TOP 5</h3><span class="text-xs font-bold text-violet-700 bg-violet-50 px-3 py-1 rounded-lg">보통 · 학급별 최고 기록</span></div>
+          <p id="memory-leaderboard-status" class="text-xs text-slate-500">Firebase 연결을 확인하는 중입니다.</p>
+          <div id="memory-leaderboard" class="space-y-2 text-sm"></div>
+        </div>
+      </section>
     </section>
 
     <!-- VIEW: ACADEMIC SCHEDULE -->
@@ -1519,6 +1542,7 @@
         }
         if (myGeneration !== firebaseSyncGeneration) return;
         firebaseReady = true;
+        setTimeout(memoryAttachScores,0);
         setTimeout(attachNotifierLayout,0);
         attachClassSchedule();
         initReactionChallengeListener();
@@ -1972,13 +1996,114 @@
       resetIdleTimer();
     }
 
+
+    // Memory Match: self-contained game. Other game logic is unchanged.
+    const memorySymbols=['🍎','🚀','🐱','⭐','🎸','⚽','🌈','🦋','🐼','🍀'];
+    let memoryGame=null, memoryTick=null, memoryFlipTimer=null, memoryScoresRef=null;
+    function memoryNewGame(){
+      clearInterval(memoryTick);clearTimeout(memoryFlipTimer);memoryTick=null;memoryFlipTimer=null;
+      const difficulty=document.getElementById('memory-difficulty').value;
+      const config={easy:[3,6],normal:[4,8],hard:[5,10]}[difficulty];
+      const pool=memorySymbols.slice(0,config[1]).flatMap((_,i)=>[i,i]);
+      for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+      memoryGame={difficulty,columns:config[0],cards:pool,open:[],matched:new Set(),moves:0,start:0,elapsed:0,locked:false,finished:false,token:(memoryGame?memoryGame.token+1:1)};
+      const board=document.getElementById('memory-board');board.style.gridTemplateColumns='repeat('+config[0]+',minmax(0,1fr))';
+      board.innerHTML='';
+      pool.forEach((v,i)=>{
+        const btn=document.createElement('button');btn.type='button';btn.dataset.index=i;
+        btn.className='memory-tile min-w-0 aspect-square rounded-2xl bg-indigo-600 text-white text-2xl sm:text-4xl font-black shadow-sm transition-transform active:scale-95 select-none touch-manipulation';
+        btn.setAttribute('aria-label','가려진 카드 '+(i+1));btn.textContent='?';btn.onclick=()=>memoryFlip(i);
+        board.appendChild(btn);
+      });
+      document.getElementById('memory-status').textContent='카드를 누르면 타이머가 시작됩니다.';
+      memoryUpdateStats();
+    }
+    function memoryUpdateStats(){
+      if(!memoryGame)return;
+      document.getElementById('memory-time').textContent=(memoryGame.elapsed/1000).toFixed(1)+'초';
+      document.getElementById('memory-moves').textContent=memoryGame.moves;
+      document.getElementById('memory-pairs').textContent=memoryGame.matched.size+'/'+(memoryGame.cards.length/2)+'쌍';
+    }
+    function memoryFlip(i){
+      const g=memoryGame;if(!g||g.locked||g.finished||g.open.includes(i)||g.matched.has(g.cards[i]))return;
+      if(!g.start){g.start=performance.now();memoryTick=setInterval(()=>{if(memoryGame!==g)return;g.elapsed=performance.now()-g.start;memoryUpdateStats();},100);}
+      g.open.push(i);const btn=document.querySelector('#memory-board [data-index="'+i+'"]');
+      btn.textContent=memorySymbols[g.cards[i]];btn.classList.remove('bg-indigo-600');btn.classList.add('bg-violet-100','text-slate-900');btn.setAttribute('aria-label',memorySymbols[g.cards[i]]);
+      if(g.open.length!==2)return;
+      g.moves++;
+      const [a,b]=g.open;
+      if(g.cards[a]===g.cards[b]){
+        g.matched.add(g.cards[a]);g.open=[];
+        [a,b].forEach(k=>{const el=document.querySelector('#memory-board [data-index="'+k+'"]');el.classList.add('bg-emerald-100');el.disabled=true;});
+        if(g.matched.size===g.cards.length/2){
+          g.finished=true;g.elapsed=performance.now()-g.start;clearInterval(memoryTick);memoryTick=null;
+          document.getElementById('memory-status').textContent='🎉 성공! '+(g.elapsed/1000).toFixed(1)+'초 · '+g.moves+'회 시도';
+          if(g.difficulty==='normal')memorySaveScore(g);
+          else document.getElementById('memory-status').textContent+=' · 연습 모드는 공식 기록에서 제외됩니다.';
+        }
+      }else{
+        g.locked=true;
+        memoryFlipTimer=setTimeout(()=>{
+          if(memoryGame!==g)return;
+          [a,b].forEach(k=>{const el=document.querySelector('#memory-board [data-index="'+k+'"]');if(el){el.textContent='?';el.setAttribute('aria-label','가려진 카드 '+(k+1));el.classList.add('bg-indigo-600');el.classList.remove('bg-violet-100','text-slate-900');}});
+          g.open=[];g.locked=false;memoryFlipTimer=null;
+        },950);
+      }
+      memoryUpdateStats();
+    }
+    function memoryScoreItems(value){
+      const rows=value&&Array.isArray(value.items)?value.items:[];
+      return rows.filter(x=>x&&typeof x.className==='string'&&Number.isFinite(Number(x.ms))&&Number(x.ms)>0)
+        .sort((a,b)=>Number(a.ms)-Number(b.ms)||Number(a.moves)-Number(b.moves)).slice(0,5);
+    }
+    function memoryRenderScores(items){
+      const el=document.getElementById('memory-leaderboard');if(!el)return;el.innerHTML='';
+      if(!items.length){el.textContent='아직 등록된 기록이 없습니다.';return;}
+      items.forEach((item,i)=>{
+        const row=document.createElement('div');row.className='flex justify-between gap-3 rounded-xl bg-slate-50 p-3 font-bold';
+        const name=document.createElement('span');name.textContent=(i+1)+'위 · '+item.className;
+        const score=document.createElement('span');score.textContent=(Number(item.ms)/1000).toFixed(2)+'초 · '+Number(item.moves||0)+'회';
+        row.append(name,score);el.appendChild(row);
+      });
+    }
+    function memoryAttachScores(){
+      if(memoryScoresRef||!firebaseReady||!firebaseAuth.currentUser)return;
+      memoryScoresRef=firebaseDb.ref('common/memoryGameScores');
+      memoryScoresRef.on('value',snap=>{
+        memoryRenderScores(memoryScoreItems(snap.val()));
+        document.getElementById('memory-leaderboard-status').textContent='Firebase 실시간 기록';
+      },err=>{document.getElementById('memory-leaderboard-status').textContent='기록을 읽을 수 없습니다. Firebase 규칙에 memoryGameScores를 추가해 주세요.';console.warn(err);});
+    }
+    async function memorySaveScore(g){
+      if(!firebaseReady||!firebaseAuth.currentUser){document.getElementById('memory-status').textContent+=' · Firebase 미연결: 기록 저장 불가';return;}
+      const className=String(state.className||'미지정 학급').slice(0,30);
+      const entry={className,ms:Math.round(g.elapsed),moves:g.moves,date:new Date().toISOString().slice(0,10)};
+      try{
+        const ref=firebaseDb.ref('common/memoryGameScores');
+        const result=await ref.transaction(current=>{
+          const rows=memoryScoreItems(current);
+          const old=rows.find(x=>x.className===className);
+          if(old&&(Number(old.ms)<entry.ms||(Number(old.ms)===entry.ms&&Number(old.moves)<=entry.moves)))return;
+          const updated=rows.filter(x=>x.className!==className).concat(entry)
+            .sort((a,b)=>Number(a.ms)-Number(b.ms)||Number(a.moves)-Number(b.moves)).slice(0,5);
+          return {items:updated};
+        },undefined,false);
+        if(memoryGame===g)document.getElementById('memory-status').textContent+=result.committed?' · 명예의 전당 기록 확인 완료':' · 기존 최고 기록 유지';
+      }catch(e){console.warn('기억력 게임 기록 저장 실패:',e);if(memoryGame===g)document.getElementById('memory-status').textContent+=' · Firebase 저장 실패 (규칙 확인)';}
+    }
+    window.addEventListener('DOMContentLoaded',()=>{
+      memoryNewGame();
+      firebaseAuth.onAuthStateChanged(user=>{if(user)setTimeout(memoryAttachScores,200);});
+      setTimeout(memoryAttachScores,1500);
+    });
+
     function switchGameCenter(game) {
-      ['clickrace', 'reaction'].forEach(g => {
+      ['clickrace', 'reaction', 'memory'].forEach(g => {
         const view = document.getElementById(`game-view-${g}`);
         if (view) view.classList.toggle('hidden', g !== game);
         const btn = document.getElementById(`game-sub-btn-${g}`);
         if (!btn) return;
-        if (g === game) btn.className = g === 'clickrace' ? 'flex-1 min-w-[150px] bg-amber-500 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition' : 'flex-1 min-w-[150px] bg-cyan-600 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition';
+        if (g === game) btn.className = g === 'clickrace' ? 'flex-1 min-w-[150px] bg-amber-500 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition' : g === 'memory' ? 'flex-1 min-w-[150px] bg-violet-600 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition' : 'flex-1 min-w-[150px] bg-cyan-600 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition';
         else btn.className = 'flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition';
       });
     }
