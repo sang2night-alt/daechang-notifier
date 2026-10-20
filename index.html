@@ -330,6 +330,11 @@
     }
     /* Notifier: leave a safe bottom margin on landscape tablets, without clipping cards. */
     #view-notifier { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+    /* The fixed-position edit button is a direct child of a Tailwind space-y section.
+       Tailwind adds a top margin to the next sibling (#card-grid), even though the
+       fixed button takes no layout space. Remove only that phantom margin so the
+       notifier cards start at the same height as all other tabs. */
+    #view-notifier > #card-grid { margin-top: 0 !important; }
     #card-grid > .grid-item { height:auto; min-height:0; }
 
     /* Notifier layout only: 12-step widths, preserving user card order. */
