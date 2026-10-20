@@ -1860,7 +1860,8 @@
       const classKey = getClassKey();
       // 서버에는 여러 기기가 공유해야 하는 학급 데이터만 저장한다.
       // PIN, 인증 상태, 현재 탭, 선택 요일, 카드 크기 등 기기/UI 상태는 Firebase에 올리지 않는다.
-      await firebaseDb.ref(`classes/${classKey}`).set(getFirebaseClassState());
+      // 부분 업데이트로 저장하여 별도 경로인 praiseStudents 및 향후 추가되는 학급 데이터를 보존한다.
+      await firebaseDb.ref(`classes/${classKey}`).update(getFirebaseClassState());
     }
 
     async function dispatchSyncData(packet, isCommonTopic = false, topicName = '') {
