@@ -555,6 +555,10 @@
             <div id="praise-bar-display" class="hidden" style="width:75%"></div>
           </div>
           <span id="praise-msg-display" class="sr-only"></span>
+          <div id="praise-student-field" class="praise-student-field mt-3" aria-label="칭찬 학생 아이콘 공간">
+            <div id="praise-student-empty" class="absolute inset-0 flex items-center justify-center text-xs text-slate-500 font-bold pointer-events-none">교사 대시보드에서 학생 이름을 등록해 주세요.</div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">교사가 학생 아이콘을 두 번 누르면 칭찬 +1 · 아이콘이 성장합니다.</p>
         <div class="notifier-edit-grip" data-resize="praise" title="끌어서 가로·세로 크기 조절" aria-label="praise 크기 조절"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></div></div>
         <!-- Per-class dated schedule -->
         <div data-id="classschedule" id="card-classschedule" class="grid-item col-span-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
@@ -1094,6 +1098,13 @@
           </div>
 
           <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-3">
+            <h3 class="font-extrabold text-slate-800"><i class="fa-solid fa-user-group text-rose-500 mr-2"></i>칭찬 학생 관리</h3>
+            <div class="flex gap-2"><input id="praise-student-name" maxlength="20" placeholder="학생 이름" class="flex-1 min-w-0 border border-slate-300 rounded-xl p-2.5 text-sm" onkeydown="if(event.key==='Enter')addPraiseStudent()"><button onclick="addPraiseStudent()" class="bg-rose-500 text-white rounded-xl px-4 font-bold text-sm">+ 등록</button></div>
+            <p class="text-xs text-slate-500">칭찬은 아이콘을 더블 클릭(태블릿은 빠르게 두 번 터치)합니다. 잘못 준 칭찬은 아래 − 버튼으로 취소할 수 있습니다.</p>
+            <div id="praise-student-manager" class="space-y-2"></div>
+            <p id="praise-student-sync" class="text-xs text-slate-500"></p>
+          </div>
+          <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-3">
             <div class="flex justify-between items-center pb-2 border-b border-slate-100">
               <h3 class="text-base font-extrabold text-slate-800 flex items-center">
                 <i class="fa-solid fa-comments text-teal-600 mr-2"></i> 실시간 학생 마음 수신함
@@ -1288,6 +1299,14 @@
     <span id="toast-message" class="text-sm">성공적으로 저장되었습니다.</span>
   </div>
 
+<style>
+.praise-student-field{position:relative;min-height:235px;overflow:hidden;border-radius:16px;background:radial-gradient(circle at 15% 25%,#fef3c7,transparent 45%),linear-gradient(130deg,#fff1f2,#e0f2fe)}
+.praise-floating-student{position:absolute;left:var(--px);top:var(--py);width:var(--sz);height:var(--sz);border-radius:50%;border:3px solid white;box-shadow:0 5px 13px #64748b40;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:clamp(10px,1.3vw,14px);line-height:1.3;cursor:pointer;user-select:none;touch-action:manipulation;animation:praise-float var(--duration) ease-in-out infinite alternate;animation-delay:var(--delay);transition:width .35s,height .35s,box-shadow .3s;z-index:1}
+.praise-floating-student span{font-size:10px;opacity:.9}
+.praise-floating-student.praise-pop{box-shadow:0 0 0 8px #fbbf2477,0 6px 20px #f59e0b99}
+@keyframes praise-float{from{transform:translate(-50%,-50%) translate(-6px,4px)}to{transform:translate(-50%,-50%) translate(6px,-5px)}}
+@media(prefers-reduced-motion:reduce){.praise-floating-student{animation:none}}
+</style>
   <script>
     // DEFAULT STATE SCHEMA
     const defaultState = {
@@ -1582,6 +1601,9 @@
         }
         if (myGeneration !== firebaseSyncGeneration) return;
         firebaseReady = true;
+        if(praiseStudentsRef&&praiseStudentsListener)praiseStudentsRef.off('value',praiseStudentsListener);
+        praiseStudentsRef=null;
+        praiseStudentAttach();
         setTimeout(memoryAttachScores,0);
         setTimeout(memoryWatchChallenges,0);
         setTimeout(attachNotifierLayout,0);
@@ -3967,6 +3989,93 @@
       `).join('');
     }
 
+
+    // 칭찬 학생: 기존 온도계 및 학급 데이터 저장 구조를 변경하지 않는 독립 Firebase 경로
+    let praiseStudents={},praiseStudentsRef=null,praiseStudentsKey='',praiseStudentsListener=null;
+    function praiseStudentRows(){return Object.entries(praiseStudents||{}).filter(([id,v])=>v&&typeof v.name==='string').sort((a,b)=>a[1].name.localeCompare(b[1].name,'ko'));}
+    function praiseStudentHash(v){let h=0;for(const c of v)h=(h*31+c.charCodeAt(0))>>>0;return h;}
+    function praiseStudentLocalKey(){return 'daechang_praise_students_'+getClassKey();}
+    function praiseStudentsRender(){
+      const field=document.getElementById('praise-student-field'),mgr=document.getElementById('praise-student-manager');
+      if(!field||!mgr)return;
+      field.querySelectorAll('.praise-floating-student').forEach(x=>x.remove());
+      mgr.replaceChildren();
+      const rows=praiseStudentRows();
+      const empty=document.getElementById('praise-student-empty');if(empty)empty.classList.toggle('hidden',rows.length>0);
+      const colors=['#f59e0b','#8b5cf6','#10b981','#ec4899','#3b82f6','#ef4444','#0d9488'];
+      rows.forEach(([id,student],idx)=>{
+        const h=praiseStudentHash(id),count=Math.max(0,Number(student.count)||0);
+        const size=Math.round(51+Math.min(10,count)*3);
+        const columns=Math.max(3,Math.ceil(Math.sqrt(rows.length*1.8)));
+        const row=Math.floor(idx/columns),col=idx%columns,rowsCount=Math.ceil(rows.length/columns);
+        const x=12+(col+.5)*76/columns,y=12+(row+.5)*76/rowsCount;
+        const b=document.createElement('button');b.type='button';b.className='praise-floating-student';
+        b.style.setProperty('--px',x+'%');b.style.setProperty('--py',y+'%');
+        b.style.setProperty('--sz',size+'px');b.style.setProperty('--bg',colors[h%colors.length]);
+        b.style.setProperty('--duration',(3.5+h%30/10)+'s');b.style.setProperty('--delay',-(h%30/10)+'s');
+        b.title=student.name+' · 칭찬 '+count+'회 (교사만 더블 클릭)';
+        const name=document.createElement('strong');name.textContent=student.name;
+        const num=document.createElement('span');num.textContent='★ '+count;
+        b.append(name,num);
+        let lastTap=0;
+        b.addEventListener('click',()=>{
+          const now=Date.now();if(now-lastTap<450){lastTap=0;praiseStudentAward(id,1,b);}else lastTap=now;
+        });
+        field.appendChild(b);
+        const r=document.createElement('div');r.className='flex items-center gap-2 bg-slate-50 p-2 rounded-xl text-sm';
+        const label=document.createElement('span');label.className='flex-1 font-bold';label.textContent=student.name+' · '+count+'회';
+        const minus=document.createElement('button');minus.className='px-3 py-1 bg-slate-200 rounded-lg font-bold';minus.textContent='−';minus.onclick=()=>praiseStudentAward(id,-1);
+        const plus=document.createElement('button');plus.className='px-3 py-1 bg-rose-100 text-rose-700 rounded-lg font-bold';plus.textContent='+1';plus.onclick=()=>praiseStudentAward(id,1);
+        const del=document.createElement('button');del.className='px-2 py-1 text-rose-600 font-bold';del.textContent='삭제';del.onclick=()=>removePraiseStudent(id);
+        r.append(label,minus,plus,del);mgr.appendChild(r);
+      });
+    }
+    function praiseStudentAttach(){
+      const key=getClassKey();
+      if(praiseStudentsKey===key&&praiseStudentsRef)return;
+      if(praiseStudentsRef&&praiseStudentsListener)praiseStudentsRef.off('value',praiseStudentsListener);
+      praiseStudentsRef=null;praiseStudentsKey=key;
+      try{praiseStudents=JSON.parse(localStorage.getItem(praiseStudentLocalKey())||'{}')||{};}catch(e){praiseStudents={};}
+      praiseStudentsRender();
+      if(!firebaseReady||!firebaseAuth.currentUser)return;
+      praiseStudentsRef=firebaseDb.ref('classes/'+key+'/praiseStudents');
+      praiseStudentsListener=snap=>{
+        if(praiseStudentsKey!==key)return;
+        praiseStudents=snap.val()||{};
+        try{localStorage.setItem(praiseStudentLocalKey(),JSON.stringify(praiseStudents));}catch(e){}
+        praiseStudentsRender();
+        const status=document.getElementById('praise-student-sync');if(status)status.textContent='실시간 저장 연결됨';
+      };
+      praiseStudentsRef.on('value',praiseStudentsListener,err=>{
+        const status=document.getElementById('praise-student-sync');if(status)status.textContent='Firebase 권한 오류: praiseStudents 규칙을 확인하세요.';
+        console.warn('칭찬 학생 동기화 오류',err);
+      });
+    }
+    async function praiseStudentWrite(id,updater){
+      if(!state.isTeacherAuthenticated){showToast('교사 인증 후 칭찬을 관리할 수 있습니다.',true);return;}
+      if(!firebaseReady||!firebaseAuth.currentUser){showToast('Firebase 연결 후 학생을 관리해 주세요.',true);return;}
+      praiseStudentAttach();
+      try{await firebaseDb.ref('classes/'+getClassKey()+'/praiseStudents/'+id).transaction(updater);}
+      catch(e){showToast('칭찬 저장 실패: Firebase 규칙을 확인하세요.',true);console.warn(e);}
+    }
+    function addPraiseStudent(){
+      if(!state.isTeacherAuthenticated){showToast('교사 인증이 필요합니다.',true);return;}
+      const input=document.getElementById('praise-student-name');const name=(input?.value||'').trim();
+      if(!name||name.length>20){showToast('학생 이름을 1~20자로 입력하세요.',true);return;}
+      if(praiseStudentRows().some(([,v])=>v.name===name)){showToast('이미 등록된 학생입니다.',true);return;}
+      const id='s'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+      praiseStudentWrite(id,old=>old||{name,count:0});if(input)input.value='';
+    }
+    function praiseStudentAward(id,delta,button){
+      if(!state.isTeacherAuthenticated){showToast('칭찬은 교사 인증 후 부여할 수 있습니다.',true);return;}
+      if(button){button.classList.add('praise-pop');setTimeout(()=>button.classList.remove('praise-pop'),450);}
+      praiseStudentWrite(id,old=>old&&typeof old.name==='string'?{name:old.name,count:Math.max(0,Math.min(999,(Number(old.count)||0)+delta))}:undefined);
+    }
+    function removePraiseStudent(id){
+      if(!state.isTeacherAuthenticated){showToast('교사 인증이 필요합니다.',true);return;}
+      const v=praiseStudents[id];if(!v||!confirm(v.name+' 학생의 칭찬 기록을 삭제하시겠습니까?'))return;
+      praiseStudentWrite(id,()=>null);
+    }
     function renderPraise() {
       const tempDisplay = document.getElementById('praise-temp-display');
       if (tempDisplay) tempDisplay.innerText = state.praiseTemp;
@@ -3982,6 +4091,7 @@
 
       const msgInput = document.getElementById('praise-msg-input');
       if (msgInput) msgInput.value = state.praiseMsg;
+      praiseStudentAttach();
     }
 
     function savePraiseSettings() {
