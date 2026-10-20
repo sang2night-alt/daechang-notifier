@@ -331,6 +331,46 @@
     /* Notifier: leave a safe bottom margin on landscape tablets, without clipping cards. */
     #view-notifier { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
     #card-grid > .grid-item { height:auto; min-height:0; }
+
+    /* Notifier layout only: 12-step widths, preserving user card order. */
+    @media (min-width:900px) and (orientation:landscape) {
+      #card-grid { grid-template-columns:repeat(12,minmax(0,1fr)); }
+      #card-grid > .grid-item { grid-column:span var(--notifier-span,4) / span var(--notifier-span,4) !important; }
+    }
+    @media (min-width:768px) and (max-width:899px) {
+      #card-grid { grid-template-columns:repeat(12,minmax(0,1fr)); }
+      #card-grid > .grid-item { grid-column:span var(--notifier-span,6) / span var(--notifier-span,6) !important; }
+    }
+    @media (max-width:767px) {
+      #card-grid { grid-template-columns:minmax(0,1fr); }
+      #card-grid > .grid-item { grid-column:1 / -1 !important; }
+    }
+    #card-grid .notifier-width-controls { display:inline-flex; align-items:center; gap:3px; flex-wrap:wrap; }
+    #card-grid .notifier-width-controls button { padding:3px 6px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:10px; font-weight:800; }
+
+    /* Only notifier card vertical sizing; content remains accessible by scrolling. */
+    #card-grid { align-items:start; }
+    #card-grid > .grid-item { min-height:0; min-width:0; }
+    #card-grid > .grid-item.notifier-height-fixed { height:var(--notifier-height) !important; overflow-y:auto; overscroll-behavior:contain; }
+    #card-grid .notifier-height-controls { display:inline-flex; align-items:center; gap:3px; flex-wrap:wrap; margin-top:4px; }
+    #card-grid .notifier-height-controls button { padding:3px 6px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:10px; font-weight:800; }
+
+
+/* Floating notifier edit control: takes no space in card layout. */
+#notifier-edit-toggle {position:fixed;right:max(12px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:80;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:rgba(51,65,85,.80);color:white;box-shadow:0 3px 12px rgba(0,0,0,.16);font-size:16px;backdrop-filter:blur(5px);touch-action:manipulation;}
+#notifier-edit-toggle:hover {background:rgba(51,65,85,.95)}
+#view-notifier.notifier-editing #notifier-edit-toggle {background:#4f46e5}
+#view-notifier.hidden #notifier-edit-toggle {display:none !important}
+
+/* Notifier edit mode: no controls visible during normal use. */
+#card-grid .drag-handle {display:none}
+#card-grid .notifier-edit-grip {display:none}
+#view-notifier.notifier-editing #card-grid > .grid-item {position:relative;outline:2px dashed #818cf8;outline-offset:-2px;touch-action:pan-y}
+#view-notifier.notifier-editing #card-grid .drag-handle {display:inline-flex;cursor:grab;touch-action:none;padding:7px;color:#4f46e5}
+#view-notifier.notifier-editing #card-grid .notifier-edit-grip {display:flex;position:absolute;bottom:5px;right:5px;width:38px;height:38px;align-items:center;justify-content:center;background:#eef2ff;color:#4338ca;border:1px solid #a5b4fc;border-radius:10px;cursor:nwse-resize;touch-action:none;user-select:none;z-index:5}
+#view-notifier.notifier-editing #card-grid .grid-item {padding-bottom:45px}
+#view-notifier.notifier-editing #card-grid .notifier-edit-grip i {pointer-events:none}
+#view-notifier.notifier-editing #card-grid .drag-handle i {pointer-events:none}
     /* Click Race: lock touch scrolling only while the 15-second game is active */
     html.clickrace-scroll-locked,
     body.clickrace-scroll-locked {
@@ -433,7 +473,7 @@
 
     <!-- VIEW 1: SMART NOTIFIER DASHBOARD -->
     <section id="view-notifier" class="space-y-6">
-      <div id="card-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <button type="button" id="notifier-edit-toggle" onclick="toggleNotifierEdit()" title="배치 편집" aria-label="배치 편집" aria-pressed="false"><i id="notifier-edit-icon" class="fa-solid fa-sliders" aria-hidden="true"></i></button><div id="card-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         <!-- CARD 1: TIMETABLE -->
         <div data-id="timetable" id="card-timetable" class="grid-item col-span-1 bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md flex flex-col justify-between">
@@ -446,8 +486,8 @@
                 </h3>
               </div>
               <div class="flex items-center space-x-1">
-                <button onclick="changeCardSize('card-timetable', 'col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">1열</button>
-                <button onclick="changeCardSize('card-timetable', 'col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">2열</button>
+                
+                
               </div>
             </div>
 
@@ -466,7 +506,7 @@
             <span id="timetable-day-info">* 월~금 교시별 실시간 반영</span>
             <span class="text-indigo-600 font-bold" id="timetable-status-badge">1~8교시</span>
           </div>
-        </div>
+        <div class="notifier-edit-grip" data-resize="timetable" title="끌어서 가로·세로 크기 조절" aria-label="timetable 크기 조절"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></div></div>
 
         <!-- CARD 2: TODAY'S TO-DO LIST -->
         <div data-id="todo" id="card-todo" class="grid-item col-span-1 bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md flex flex-col justify-between">
@@ -479,8 +519,8 @@
                 </h3>
               </div>
               <div class="flex items-center space-x-1">
-                <button onclick="changeCardSize('card-todo', 'col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 font-bold">1열</button>
-                <button onclick="changeCardSize('card-todo', 'col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 font-bold">2열</button>
+                
+                
               </div>
             </div>
 
@@ -488,14 +528,14 @@
               <input type="text" id="new-todo-input" placeholder="새로운 할 일 입력..." onkeydown="if(event.key === 'Enter') addTodoItem()" class="flex-1 min-w-0 border border-slate-300 rounded-xl p-2.5 text-xs sm:text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
               <button onclick="addTodoItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3.5 py-2.5 rounded-xl text-xs sm:text-sm transition whitespace-nowrap">➕ 추가</button>
             </div>
-            <ul id="todo-list-display" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></ul>
+            <ul id="todo-list-display" class="space-y-2 max-h-64 overflow-y-auto pr-1"></ul>
           </div>
 
           <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
             <span>체크하여 완료 상태 업데이트</span>
             <span class="text-emerald-600 font-bold" id="todo-count-badge">0개 진행 중</span>
           </div>
-        </div>
+        <div class="notifier-edit-grip" data-resize="todo" title="끌어서 가로·세로 크기 조절" aria-label="todo 크기 조절"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></div></div>
 
         <!-- Compact praise display; existing teacher controls and data IDs are preserved -->
         <div data-id="praise" id="card-praise" class="grid-item col-span-1 md:col-span-2 bg-white rounded-2xl p-3 shadow-sm border border-slate-200">
@@ -506,15 +546,15 @@
             <div id="praise-bar-display" class="hidden" style="width:75%"></div>
           </div>
           <span id="praise-msg-display" class="sr-only"></span>
-        </div>
+        <div class="notifier-edit-grip" data-resize="praise" title="끌어서 가로·세로 크기 조절" aria-label="praise 크기 조절"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></div></div>
         <!-- Per-class dated schedule -->
         <div data-id="classschedule" id="card-classschedule" class="grid-item col-span-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
           <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
             <div class="flex items-center gap-2"><span class="drag-handle text-slate-300 hover:text-slate-500" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span><h3 class="font-extrabold text-base"><i class="fa-solid fa-calendar-check text-indigo-600 mr-2"></i>우리반 스케줄</h3></div>
-            <div class="flex items-center gap-1"><button type="button" onclick="changeCardSize('card-classschedule','col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">1열</button><button type="button" onclick="changeCardSize('card-classschedule','col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">2열</button><button type="button" onclick="switchTab('classschedule')" class="text-xs font-extrabold bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl">날짜별 관리 <i class="fa-solid fa-arrow-right ml-1"></i></button></div>
+            <div class="flex items-center gap-1"><button type="button" onclick="switchTab('classschedule')" class="text-xs font-extrabold bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl">날짜별 관리 <i class="fa-solid fa-arrow-right ml-1"></i></button></div>
           </div>
           <div id="classschedule-today" class="text-sm text-slate-600"></div>
-        </div>
+        <div class="notifier-edit-grip" data-resize="classschedule" title="끌어서 가로·세로 크기 조절" aria-label="classschedule 크기 조절"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></div></div>
 
       </div>
     </section>
@@ -1467,6 +1507,7 @@
         }
         if (myGeneration !== firebaseSyncGeneration) return;
         firebaseReady = true;
+        setTimeout(attachNotifierLayout,0);
         attachClassSchedule();
         initReactionChallengeListener();
 
@@ -3297,7 +3338,7 @@
       }
 
       const normalTodos = state.todos.map(t => `
-        <li class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 shadow-sm">
+        <li class="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/70 shadow-sm">
           <label class="flex items-center space-x-2.5 cursor-pointer flex-1 min-w-0">
             <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})" class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
             <span class="text-xs sm:text-sm font-bold ${t.done ? 'line-through text-slate-400' : 'text-slate-700'}">${t.text}</span>
@@ -3307,7 +3348,7 @@
       `).join('');
 
       const academicTodos = todayAcademic.map(item => `
-        <li class="flex items-center justify-between p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 shadow-sm">
+        <li class="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 shadow-sm">
           <div class="flex items-center space-x-2.5 flex-1 min-w-0">
             <span class="w-4 h-4 flex items-center justify-center text-indigo-600 shrink-0"><i class="fa-solid fa-calendar-day"></i></span>
             <span class="text-xs sm:text-sm font-bold text-slate-700">${escapeHtml(item.title)}</span>
@@ -4073,6 +4114,215 @@
     window.addEventListener('DOMContentLoaded',()=>{loadClassScheduleLocal();setTimeout(attachClassSchedule,1800);});
     window.addEventListener('pagehide',()=>{if(classScheduleRef&&classScheduleCallback)classScheduleRef.off('value',classScheduleCallback);});
 
+
+    // Isolated per-class notifier layout synchronization. No existing data paths are changed.
+    const notifierLayoutIds=['timetable','todo','classschedule','praise'];
+    let notifierLayoutRef=null, notifierLayoutListener=null, notifierLayoutClass=null;
+    let notifierLayoutLoaded=false, notifierLayoutApplying=false;
+    let notifierLayoutDirty=false, notifierLayoutSaving=false;
+    let notifierLayoutPendingByClass={};
+    let notifierLayout={order:notifierLayoutIds.slice(),widths:{timetable:4,todo:4,classschedule:4,praise:4},heights:{}};
+    function notifierLayoutStorageKey(key=getClassKey()){return 'daechang_notifier_layout_v1_'+key;}
+    function sanitizeNotifierLayout(raw){
+      const x=raw&&typeof raw==='object'?raw:{};
+      const order=Array.isArray(x.order)?x.order.filter(id=>notifierLayoutIds.includes(id)):[];
+      notifierLayoutIds.forEach(id=>{if(!order.includes(id))order.push(id);});
+      const widths={};
+      notifierLayoutIds.forEach(id=>{
+        const n=Number(x.widths&&x.widths[id]);
+        widths[id]=Number.isInteger(n)&&n>=1&&n<=12?n:4;
+      });
+      const heights={};
+      notifierLayoutIds.forEach(id=>{
+        const h=Number(x.heights&&x.heights[id]);
+        if(Number.isInteger(h)&&h>=120&&h<=1200)heights[id]=h;
+      });
+      return {order,widths,heights};
+    }
+    function applyNotifierLayout(layout){
+      notifierLayoutApplying=true;
+      notifierLayout=sanitizeNotifierLayout(layout);
+      const grid=document.getElementById('card-grid');
+      if(grid){
+        notifierLayout.order.forEach(id=>{const card=document.getElementById('card-'+id);if(card)grid.appendChild(card);});
+        notifierLayoutIds.forEach(id=>{
+          const card=document.getElementById('card-'+id),n=notifierLayout.widths[id];
+          if(card){
+            card.style.setProperty('--notifier-span',n);
+            const h=notifierLayout.heights[id];
+            card.classList.toggle('notifier-height-fixed',Boolean(h));
+            if(h)card.style.setProperty('--notifier-height',h+'px');
+            else card.style.removeProperty('--notifier-height');
+          }
+          const heightLabel=document.getElementById('notifier-height-'+id);
+          if(heightLabel)heightLabel.textContent=notifierLayout.heights[id] ? notifierLayout.heights[id]+'px' : '자동';
+          const label=document.getElementById('notifier-width-'+id);
+          if(label)label.textContent=n+'/12';
+        });
+      }
+      try{localStorage.setItem(notifierLayoutStorageKey(),JSON.stringify(notifierLayout));}catch(_){}
+      notifierLayoutApplying=false;
+    }
+    async function flushNotifierLayout(){
+      const key=getClassKey();
+      if(notifierLayoutSaving||!notifierLayoutRef||notifierLayoutClass!==key||!notifierLayoutLoaded||!firebaseReady||!firebaseAuth.currentUser)return;
+      if(!notifierLayoutDirty||!notifierLayoutPendingByClass[key])return;
+      notifierLayoutSaving=true;
+      const snapshot=notifierLayoutPendingByClass[key];
+      try{
+        await notifierLayoutRef.set(snapshot);
+        if(notifierLayoutPendingByClass[key]===snapshot){
+          delete notifierLayoutPendingByClass[key];
+          notifierLayoutDirty=false;
+        }
+      }catch(e){console.warn('레이아웃 Firebase 저장 실패, 재연결 시 재시도:',e);}
+      finally{
+        notifierLayoutSaving=false;
+        if(notifierLayoutDirty&&notifierLayoutPendingByClass[key]&&notifierLayoutPendingByClass[key]!==snapshot){
+          setTimeout(flushNotifierLayout,0);
+        }
+      }
+    }
+    function persistNotifierLayout(){
+      if(notifierLayoutApplying)return;
+      const grid=document.getElementById('card-grid');
+      if(grid)notifierLayout.order=[...grid.querySelectorAll('.grid-item')].map(e=>e.dataset.id).filter(id=>notifierLayoutIds.includes(id));
+      const snapshot=sanitizeNotifierLayout(notifierLayout);
+      const key=getClassKey();
+      try{localStorage.setItem(notifierLayoutStorageKey(key),JSON.stringify(snapshot));}catch(_){}
+      notifierLayoutPendingByClass[key]=snapshot;
+      notifierLayoutDirty=true;
+      attachNotifierLayout();
+      flushNotifierLayout();
+    }
+    function setNotifierWidth(id,n){
+      if(!notifierLayoutIds.includes(id))return;
+      notifierLayout.widths[id]=Math.max(1,Math.min(12,Math.round(n)));
+      applyNotifierLayout(notifierLayout);
+      persistNotifierLayout();
+    }
+    function adjustNotifierWidth(id,delta){setNotifierWidth(id,(notifierLayout.widths[id]||4)+delta);}
+    function adjustNotifierHeight(id,delta){
+      if(!notifierLayoutIds.includes(id))return;
+      const card=document.getElementById('card-'+id);
+      if(!card)return;
+      const current=notifierLayout.heights[id]||Math.ceil(card.getBoundingClientRect().height);
+      notifierLayout.heights[id]=Math.max(120,Math.min(1200,Math.round((current+delta)/10)*10));
+      applyNotifierLayout(notifierLayout);
+      persistNotifierLayout();
+    }
+    function resetNotifierHeight(id){
+      if(!notifierLayoutIds.includes(id))return;
+      delete notifierLayout.heights[id];
+      applyNotifierLayout(notifierLayout);
+      persistNotifierLayout();
+    }
+    function attachNotifierLayout(){
+      const key=getClassKey();
+      if(notifierLayoutClass!==key){
+        if(notifierLayoutRef&&notifierLayoutListener)notifierLayoutRef.off('value',notifierLayoutListener);
+        notifierLayoutRef=null;notifierLayoutListener=null;notifierLayoutClass=key;notifierLayoutLoaded=false;
+        notifierLayoutSaving=false;
+        notifierLayoutDirty=Boolean(notifierLayoutPendingByClass[key]);
+        let cached=null;try{cached=JSON.parse(localStorage.getItem(notifierLayoutStorageKey(key))||'null');}catch(_){}
+        applyNotifierLayout(notifierLayoutPendingByClass[key]||cached||{order:notifierLayoutIds,widths:{timetable:4,todo:4,classschedule:4,praise:4},heights:{}});
+      }
+      if(notifierLayoutRef||!firebaseReady||!firebaseAuth.currentUser)return;
+      const ref=firebaseDb.ref('classLayouts/'+key);
+      notifierLayoutRef=ref;
+      notifierLayoutListener=snap=>{
+        if(key!==getClassKey())return;
+        notifierLayoutLoaded=true;
+        if(notifierLayoutPendingByClass[key]){
+          // Never overwrite unsynced local edits with an older server snapshot.
+          applyNotifierLayout(notifierLayoutPendingByClass[key]);
+          notifierLayoutDirty=true;
+          flushNotifierLayout();
+        }else if(snap.exists()){
+          applyNotifierLayout(snap.val());
+        }
+      };
+      ref.on('value',notifierLayoutListener,e=>{
+        console.warn('레이아웃 Firebase 읽기 실패 (규칙 확인):',e);
+        notifierLayoutLoaded=false;
+      });
+    }
+    const originalSelectClassForNotifierLayout=selectClass;
+    selectClass=function(...args){
+      const result=originalSelectClassForNotifierLayout.apply(this,args);
+      attachNotifierLayout();
+      return result;
+    };
+    window.addEventListener('DOMContentLoaded',()=>{attachNotifierLayout();setTimeout(attachNotifierLayout,2000);});
+    window.addEventListener('pagehide',()=>{if(notifierLayoutRef&&notifierLayoutListener)notifierLayoutRef.off('value',notifierLayoutListener);});
+
+
+    // Edit-only pointer controls. Saved through existing classLayouts Firebase path.
+    let notifierEditMode=false;
+    function toggleNotifierEdit(force){
+      const wasEditing=notifierEditMode;
+      notifierEditMode=typeof force==='boolean'?force:!notifierEditMode;
+      const view=document.getElementById('view-notifier');
+      if(view)view.classList.toggle('notifier-editing',notifierEditMode);
+      const toggle=document.getElementById('notifier-edit-toggle');
+      const icon=document.getElementById('notifier-edit-icon');
+      if(toggle){toggle.title=notifierEditMode?'편집 완료':'배치 편집';toggle.setAttribute('aria-label',toggle.title);toggle.setAttribute('aria-pressed',String(notifierEditMode));}
+      if(icon)icon.className=notifierEditMode?'fa-solid fa-check':'fa-solid fa-sliders';
+      document.querySelectorAll('#card-grid > .grid-item').forEach(card=>card.draggable=false);
+      // Save only when leaving a real edit session, not during startup.
+      if(wasEditing&&!notifierEditMode)persistNotifierLayout();
+    }
+    function initNotifierPointerEditing(){
+      const grid=document.getElementById('card-grid');if(!grid||grid.dataset.pointerEditing)return;
+      grid.dataset.pointerEditing='1';
+      let gesture=null;
+      grid.addEventListener('pointerdown',e=>{
+        if(!notifierEditMode||e.button!==0)return;
+        const resize=e.target.closest('.notifier-edit-grip');
+        const move=e.target.closest('.drag-handle');
+        const handle=resize||move;if(!handle)return;
+        const card=handle.closest('.grid-item');if(!card)return;
+        e.preventDefault();e.stopPropagation();
+        const rect=card.getBoundingClientRect();
+        gesture={handle,card,id:card.dataset.id,kind:resize?'resize':'move',x:e.clientX,y:e.clientY,width:rect.width,height:rect.height,span:notifierLayout.widths[card.dataset.id]||4,pointerId:e.pointerId};
+        // Capture on the stable grid: resizing can reflow/move the handle itself.
+        grid.setPointerCapture(e.pointerId);
+      });
+      grid.addEventListener('pointermove',e=>{
+        if(!gesture||!notifierEditMode||e.pointerId!==gesture.pointerId)return;
+        const g=gesture;
+        if(g.kind==='resize'){
+          const style=getComputedStyle(grid),gap=parseFloat(style.columnGap)||0;
+          const colWidth=(grid.clientWidth-gap*11)/12;
+          // Work from the saved starting span, not the card's rendered width.
+          // CSS grid track rounding and padding otherwise make horizontal dragging feel unresponsive.
+          const step=Math.max(1,colWidth+gap);
+          const n=Math.max(1,Math.min(12,g.span+Math.round((e.clientX-g.x)/step)));
+          const height=Math.max(120,Math.min(1200,Math.round((g.height+e.clientY-g.y)/20)*20));
+          notifierLayout.widths[g.id]=n;notifierLayout.heights[g.id]=height;
+          g.card.style.setProperty('--notifier-span',n);
+          g.card.classList.add('notifier-height-fixed');
+          g.card.style.setProperty('--notifier-height',height+'px');
+        }else{
+          const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('#card-grid > .grid-item');
+          if(target&&target!==g.card){
+            const r=target.getBoundingClientRect();
+            if(e.clientY<r.top+r.height/2)grid.insertBefore(g.card,target);
+            else grid.insertBefore(g.card,target.nextSibling);
+          }
+        }
+      });
+      function finish(e){
+        if(!gesture)return;
+        const g=gesture;gesture=null;
+        try{if(grid.hasPointerCapture(g.pointerId))grid.releasePointerCapture(g.pointerId);}catch(_){}
+        persistNotifierLayout();
+      }
+      grid.addEventListener('pointerup',finish);
+      grid.addEventListener('pointercancel',finish);
+    }
+    window.addEventListener('DOMContentLoaded',()=>{initNotifierPointerEditing();toggleNotifierEdit(false);});
+
     // DRAG AND DROP HANDLER
     function initDragAndDrop() {
       const grid = document.getElementById('card-grid');
@@ -4081,9 +4331,10 @@
       let draggedItem = null;
 
       grid.querySelectorAll('.grid-item').forEach(item => {
-        item.setAttribute('draggable', 'true');
+        item.setAttribute('draggable', 'false');
 
         item.addEventListener('dragstart', (e) => {
+          if(!notifierEditMode){e.preventDefault();return;}
           draggedItem = item;
           setTimeout(() => item.classList.add('dragging'), 0);
         });
@@ -4126,6 +4377,7 @@
       const items = [...grid.querySelectorAll('.grid-item')];
       const order = items.map(item => item.dataset.id);
       localStorage.setItem('daechang_card_order', JSON.stringify(order));
+      if(typeof persistNotifierLayout==='function')persistNotifierLayout();
     }
 
     function restoreCardOrder() {
@@ -4163,7 +4415,7 @@
       // 교사 인증은 저장/복원하지 않는다. 페이지를 새로 열 때마다 PIN(0815)을 다시 요구한다.
       state.isTeacherAuthenticated = false;
       if (savedClass) state.className = savedClass;
-      restoreCardOrder();
+      restoreCardOrder(); // Firebase per-class layout is applied after connection.
       const scheduleCard = document.getElementById('card-classschedule');
       if (scheduleCard) {
         scheduleCard.classList.remove('col-span-1','col-span-2');
