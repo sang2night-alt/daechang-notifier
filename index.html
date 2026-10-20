@@ -4005,6 +4005,8 @@
       const field=document.getElementById('praise-student-field');
       if(!field){praiseFloatFrame=0;return;}
       const dt=Math.min(.045,(now-(praiseFloatLast||now))/1000);praiseFloatLast=now;
+      // 다른 탭에서 돌아올 때 누적 시간/충돌 속도가 폭주하지 않도록 일시 정지한다.
+      if(!field.getClientRects().length || document.hidden){praiseFloatFrame=requestAnimationFrame(praiseFloatLoop);return;}
       const w=field.clientWidth,h=field.clientHeight;
       const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const active=[...praiseFloatItems.values()].filter(o=>o.el.isConnected);
@@ -4027,11 +4029,15 @@
           if(dist<.001){const ang=((i*97+j*37)%360)*Math.PI/180;dx=Math.cos(ang);dy=Math.sin(ang);dist=1;}
           const push=(needed-dist)/2,nx=dx/dist,ny=dy/dist;
           a.x-=nx*push;a.y-=ny*push;b.x+=nx*push;b.y+=ny*push;
-          a.vx-=nx*2;a.vy-=ny*2;b.vx+=nx*2;b.vy+=ny*2;
+          // 위치만 분리한다. 매 프레임 속도에 충돌 충격을 누적하면 비정상적으로 가속된다.
         }
         for(const o of active){const r=o.el.offsetWidth/2+2;o.x=Math.max(r,Math.min(w-r,o.x));o.y=Math.max(r,Math.min(h-r,o.y));}
       }
-      for(const o of active){const r=o.el.offsetWidth/2+2;o.el.style.transform='translate('+(o.x-r)+'px,'+(o.y-r)+'px)';}
+      for(const o of active){
+        // 속도는 최초의 느린 부유 속도를 넘지 않게 제한한다.
+        const speed=Math.hypot(o.vx,o.vy),maxSpeed=21;
+        if(speed>maxSpeed){o.vx*=maxSpeed/speed;o.vy*=maxSpeed/speed;}
+        const r=o.el.offsetWidth/2+2;o.el.style.transform='translate('+(o.x-r)+'px,'+(o.y-r)+'px)';}
       praiseFloatFrame=requestAnimationFrame(praiseFloatLoop);
     }
     function praiseFloatStart(){if(!praiseFloatFrame){praiseFloatLast=0;praiseFloatFrame=requestAnimationFrame(praiseFloatLoop);}}
@@ -4047,9 +4053,8 @@
       const colors=['#f59e0b','#8b5cf6','#10b981','#ec4899','#3b82f6','#ef4444','#0d9488'];
       rows.forEach(([id,student],idx)=>{
         const h=praiseStudentHash(id),count=Math.max(0,Number(student.count)||0);
-        // 공간이 좁을수록 기본 지름을 줄여 겹침을 억제하되 칭찬 성장비(최대 2배)는 유지한다.
-        const area=Math.max(1,field.clientWidth)*235;
-        const base=Math.min(51,Math.max(19,Math.floor(Math.sqrt(area/Math.max(1,rows.length)*0.45)/2)));
+        // 이름 가독성을 위해 기존 기본 지름 51px을 유지한다.
+        const base=51;
         const size=Math.round(base*(1+Math.min(10,count)/10)); // 칭찬 10회에서 최대 2배
         let o=praiseFloatItems.get(id);
         if(!o){
