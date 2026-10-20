@@ -318,16 +318,19 @@
       #card-grid {
         display:grid;
         grid-template-columns:repeat(3,minmax(0,1fr));
-        grid-auto-flow:row dense;
-        grid-auto-rows:minmax(130px,auto);
+        grid-auto-flow:row;
+        grid-auto-rows:auto;
         gap:clamp(12px,1.4vw,22px);
-        min-height:max(570px,calc(100dvh - 170px));
-        align-content:stretch;
+        min-height:0;
+        align-content:start;
       }
       #card-grid > .col-span-1 { grid-column:span 1 / span 1; }
       #card-grid > .col-span-2 { grid-column:span 2 / span 2; }
       #card-grid > #card-todo #todo-list-display { max-height:calc(100dvh - 355px); }
     }
+    /* Notifier: leave a safe bottom margin on landscape tablets, without clipping cards. */
+    #view-notifier { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+    #card-grid > .grid-item { height:auto; min-height:0; }
     /* Click Race: lock touch scrolling only while the 15-second game is active */
     html.clickrace-scroll-locked,
     body.clickrace-scroll-locked {
@@ -499,8 +502,8 @@
           <div class="flex flex-wrap items-center gap-3">
             <span class="drag-handle text-slate-300" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span>
             <h3 class="font-extrabold text-sm text-slate-800"><i class="fa-solid fa-temperature-half text-rose-500 mr-2"></i>우리반 칭찬 온도계</h3>
-            <div class="flex-1 min-w-[100px] bg-slate-100 rounded-full h-3 overflow-hidden"><div id="praise-bar-display" class="bg-gradient-to-r from-amber-400 to-rose-500 h-full rounded-full transition-all duration-700" style="width:75%"></div></div>
-            <span class="text-2xl font-black text-rose-600 whitespace-nowrap"><span id="praise-temp-display">75</span>°C</span>
+            <span class="ml-auto text-2xl font-black text-rose-600 whitespace-nowrap"><i class="fa-solid fa-fire text-amber-500 text-lg mr-1" aria-hidden="true"></i><span id="praise-temp-display">75</span>°C</span>
+            <div id="praise-bar-display" class="hidden" style="width:75%"></div>
           </div>
           <span id="praise-msg-display" class="sr-only"></span>
         </div>
