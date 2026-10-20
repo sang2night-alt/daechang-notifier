@@ -2218,6 +2218,7 @@
     // Memory battle: separate Firebase channels from reaction speed; never touch reaction rooms.
     let memoryBattleRef=null,memoryBattleSlot=null,memoryBattleRoomId=null,memoryBattleRoom=null;
     let memoryChallengeRef=null,memoryChallenge=null,memoryChallengeTimer=null,memoryBattleWriteBusy=false;
+    let memoryAcceptBusy=false,memorySuppressedChallengeId=null;
     let memoryScoreMode='solo',memoryActiveSeed=null;
     function memorySeededShuffle(seed,count){
       let x=(Number(seed)>>>0)||12345;
@@ -2238,6 +2239,13 @@
       const a=document.getElementById('memory-battle-mine'),b=document.getElementById('memory-battle-other');if(a)a.textContent='-';if(b)b.textContent='-';
       memoryBattleInfo('혼자 플레이 대기 중');
     }
+    function memoryServerNow(){
+      return typeof reactionServerNow==='function'?reactionServerNow():Date.now();
+    }
+    function memoryHideIncomingChallenge(){
+      memoryChallengeModal(false);
+      if(memoryChallengeTimer){clearInterval(memoryChallengeTimer);memoryChallengeTimer=null;}
+    }
     async function memoryCreateChallenge(){
       if(memoryBattleRoomId)return showToast('진행 중인 기억력 대전이 있습니다.',true);
       try{
@@ -2245,76 +2253,117 @@
         const id=Date.now()+'_'+Math.random().toString(36).slice(2,9);
         const seed=Math.floor(Math.random()*2147483647)+1;
         const ref=firebaseDb.ref('memoryRooms/'+id);
-        await ref.set({status:'waiting',seed,turn:'p1',open:[],matched:[],moves:0,scores:{p1:0,p2:0},createdAt:firebase.database.ServerValue.TIMESTAMP,players:{p1:{uid:user.uid,className:state.className}}});
-        await memoryJoinRoom(id,'p1');
         const challengeRef=firebaseDb.ref('memoryChallenge');
-        const expiry=Date.now()+10000;
-        await challengeRef.set({roomId:id,fromClass:state.className,expiresAt:expiry,status:'open'});
+        await ref.set({status:'waiting',seed,turn:'p1',open:[],matched:[],moves:0,scores:{p1:0,p2:0},createdAt:firebase.database.ServerValue.TIMESTAMP,players:{p1:{uid:user.uid,className:state.className}}});
+        const expiry=memoryServerNow()+10000;
+        await challengeRef.set({roomId:id,fromClass:state.className,senderId:clientId,createdAt:firebase.database.ServerValue.TIMESTAMP,expiresAt:expiry,status:'open'});
+        await memoryJoinRoom(id,'p1');
         memoryBattleInfo('도전장 발송! 10초 동안 수락을 기다립니다.');
         setTimeout(async()=>{
           try{
-            const tx=await challengeRef.transaction(c=>c&&c.roomId===id&&c.status==='open'?{...c,status:'expired'}:undefined);
-            if(tx.committed){await ref.transaction(r=>r&&r.status==='waiting'?null:undefined,undefined,false);if(memoryBattleRoomId===id){await memoryLeaveBattle();memoryBattleInfo('응답이 없어 도전장이 만료되었습니다.');}}
-          }catch(e){console.warn('기억력 도전장 만료 실패',e);}
-        },10050);
-      }catch(e){console.error(e);showToast('기억력 도전장을 보낼 수 없습니다. Firebase 규칙을 확인하세요.',true);}
+            // 반응속도 배틀처럼 도전장 상태는 표시용으로만 사용한다.
+            // 이미 참가자가 있는 방을 만료시키거나 삭제하지 않는다.
+            const current=await ref.once('value');
+            if(!current.exists()||current.val().players?.p2)return;
+            const tx=await challengeRef.transaction(c=>{
+              if(!c||c.roomId!==id||c.status!=='open')return;
+              return {...c,status:'expired',expiredAt:memoryServerNow()};
+            },undefined,false);
+            if(tx.committed){
+              const check=await ref.once('value');
+              if(check.exists()&&!check.val().players?.p2&&memoryBattleRoomId===id){
+                memoryBattleInfo('응답이 없어 도전장이 만료되었습니다. 다시 도전해 주세요.');
+              }
+            }
+          }catch(e){console.warn('기억력 도전장 만료 확인 실패',e);}
+        },Math.max(0,expiry-memoryServerNow())+150);
+      }catch(e){console.error('기억력 도전장 발송 실패',e);showToast('기억력 도전장을 보낼 수 없습니다: '+(e.code||e.message),true);}
     }
     function memoryWatchChallenges(){
       if(memoryChallengeRef||!firebaseAuth.currentUser)return;
       memoryChallengeRef=firebaseDb.ref('memoryChallenge');
       memoryChallengeRef.on('value',snap=>{
         const c=snap.val();memoryChallenge=c;
-        if(!c||c.status!=='open'||c.fromClass===state.className||Date.now()>=Number(c.expiresAt)||memoryBattleRoomId){memoryChallengeModal(false);return;}
+        if(!c||c.status!=='open'||c.roomId===memorySuppressedChallengeId||memoryAcceptBusy||c.senderId===clientId||c.fromClass===state.className||memoryServerNow()>=Number(c.expiresAt)||memoryBattleRoomId){
+          memoryHideIncomingChallenge();return;
+        }
         document.getElementById('memory-challenge-text').textContent=c.fromClass+'에서 기억력 카드 대결을 신청했습니다.';
         memoryChallengeModal(true);
         if(memoryChallengeTimer)clearInterval(memoryChallengeTimer);
         memoryChallengeTimer=setInterval(()=>{
-          if(!memoryChallenge||memoryChallenge.roomId!==c.roomId||Date.now()>=Number(c.expiresAt)){memoryChallengeModal(false);clearInterval(memoryChallengeTimer);return;}
-          document.getElementById('memory-challenge-countdown').textContent='남은 시간 '+Math.ceil((c.expiresAt-Date.now())/1000)+'초';
+          if(!memoryChallenge||memoryChallenge.roomId!==c.roomId||memoryServerNow()>=Number(c.expiresAt)){
+            memoryHideIncomingChallenge();return;
+          }
+          document.getElementById('memory-challenge-countdown').textContent='남은 시간 '+Math.ceil((c.expiresAt-memoryServerNow())/1000)+'초';
         },200);
       },e=>{console.warn('기억력 도전장 수신 실패',e);memoryBattleInfo('도전장 수신 오류 · Firebase memoryChallenge 규칙을 확인하세요.');});
     }
     async function memoryAcceptChallenge(){
+      if(memoryAcceptBusy)return;
       const c=memoryChallenge;
-      memoryChallengeModal(false);
-      if(!c||c.status!=='open'||Date.now()>=Number(c.expiresAt)){
-        return showToast('도전장 유효 시간이 지났습니다. 다시 보내 주세요.',true);
+      memoryHideIncomingChallenge();
+      if(!c||!c.roomId||c.status!=='open'||memoryServerNow()>=Number(c.expiresAt)){
+        return showToast('도전장 수락 시간이 지났습니다. 다시 보내 주세요.',true);
       }
+      memoryAcceptBusy=true;
+      memorySuppressedChallengeId=c.roomId;
+      const button=document.querySelector('#memory-challenge-modal button[onclick="memoryAcceptChallenge()"]');
+      if(button)button.disabled=true;
       try{
         const user=await ensureReactionAuth();
+        const roomRef=firebaseDb.ref('memoryRooms/'+c.roomId);
         const challengeRef=firebaseDb.ref('memoryChallenge');
-        // 도전장을 먼저 선점해 발송자의 만료 타이머와 경합하지 않도록 합니다.
-        const claim=await challengeRef.transaction(old=>{
-          if(!old||old.roomId!==c.roomId||old.status!=='open'||Date.now()>=Number(old.expiresAt))return;
-          return {...old,status:'accepted',acceptedBy:state.className,acceptedAt:Date.now()};
-        },undefined,false);
-        if(!claim.committed){
-          const latest=claim.snapshot.val();
-          return showToast(latest&&latest.roomId===c.roomId&&latest.status==='accepted'
-            ?'이미 수락된 도전장입니다.':'도전장이 만료되었거나 다른 학급에서 수락했습니다.',true);
+        const roomSnap=await roomRef.once('value');
+        const room=roomSnap.val();
+        if(!room||!room.players?.p1){
+          return showToast('대전 방을 찾을 수 없습니다. 새 도전장을 보내 주세요.',true);
         }
-        const ref=firebaseDb.ref('memoryRooms/'+c.roomId);
-        const tx=await ref.transaction(room=>{
-          if(!room||room.status!=='waiting'||!room.players||!room.players.p1||room.players.p2||room.players.p1.className===state.className)return;
-          return {...room,players:{...room.players,p2:{uid:user.uid,className:state.className}},status:'playing',startAt:Date.now(),turnStartedAt:Date.now()};
-        },undefined,false);
-        if(!tx.committed){
-          const latest=tx.snapshot.val();
-          // 실패했을 때는 선점했던 도전장만 되돌려 재시도할 수 있게 합니다.
-          await challengeRef.transaction(old=>old&&old.roomId===c.roomId&&old.status==='accepted'&&old.acceptedBy===state.className
-            ?{...old,status:'open',acceptedBy:null,acceptedAt:null}:undefined,undefined,false);
-          console.warn('기억력 대전 방 수락 실패:',latest);
-          return showToast(!latest?'대전 방이 없습니다. 도전장을 다시 보내 주세요.':
-            latest.status!=='waiting'?'대전 방 상태: '+latest.status+' · 새 도전장을 보내 주세요.':
-            latest.players?.p1?.className===state.className?'같은 학급끼리는 대결할 수 없습니다.':
-            '대전 방 참가 정보가 일치하지 않습니다.',true);
+        if(room.players.p1.className===state.className){
+          return showToast('같은 학급끼리는 대결할 수 없습니다.',true);
         }
+        // 반응속도 배틀의 수락 로직과 동일하게 p2 자리만 선점한다.
+        // 네트워크 지연으로 이미 내 학급이 참가했다면 기존 자리에 재연결한다.
+        const existing=room.players.p2;
+        if(existing&&existing.className!==state.className&&existing.clientId!==clientId){
+          return showToast('다른 학급이 먼저 수락했습니다.',true);
+        }
+        if(!existing&&room.status!=='waiting'){
+          return showToast('대전 방 상태: '+room.status+' · 새 도전장을 보내 주세요.',true);
+        }
+        const p2Ref=roomRef.child('players/p2');
+        const result=await p2Ref.transaction(current=>{
+          if(current)return;
+          return {uid:user.uid,clientId:clientId,className:state.className};
+        },undefined,false);
+        const joined=result.snapshot&&result.snapshot.val();
+        if(!joined||(joined.clientId!==clientId&&joined.className!==state.className)){
+          return showToast(joined?'다른 학급이 먼저 수락했습니다.':'대전 참가에 실패했습니다. 다시 시도해 주세요.',true);
+        }
+        // 참가자 확보가 성공한 경우에만 진행 상태를 전환한다.
+        await roomRef.transaction(current=>{
+          if(!current||!current.players?.p2)return;
+          if(current.status==='waiting'){
+            return {...current,status:'playing',startAt:memoryServerNow(),turnStartedAt:memoryServerNow()};
+          }
+          return current;
+        },undefined,false);
+        try{
+          await challengeRef.transaction(current=>{
+            if(!current||current.roomId!==c.roomId)return;
+            return {...current,status:'accepted',acceptedBy:state.className,acceptedClientId:clientId,acceptedAt:memoryServerNow()};
+          },undefined,false);
+        }catch(e){console.warn('기억력 도전장 표시 상태 갱신 실패',e);}
         await memoryJoinRoom(c.roomId,'p2');
-        memoryBattleInfo('대전 연결 완료 · 상대 학급과 번갈아 카드를 뒤집으세요.');
+        switchTab('gamecenter');
         switchGameCenter('memory');
+        memoryBattleInfo('대전 연결 완료 · 상대 학급과 번갈아 카드를 뒤집으세요.');
+        showToast('기억력 카드 학급 대전에 연결되었습니다!');
       }catch(e){
         console.error('기억력 도전장 수락 오류:',e);
         showToast('기억력 대전 연결 실패: '+(e.code||e.message||'알 수 없는 오류'),true);
+      }finally{
+        memoryAcceptBusy=false;
+        if(button)button.disabled=false;
       }
     }
     async function memoryJoinRoom(id,slot){
