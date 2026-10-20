@@ -904,6 +904,12 @@
           <p id="memory-leaderboard-status" class="text-xs text-slate-500">Firebase 연결을 확인하는 중입니다.</p>
           <div id="memory-leaderboard" class="space-y-2 text-sm"></div><button type="button" onclick="toggleGameRanking('memory')" id="ranking-toggle-memory" class="text-xs font-extrabold text-indigo-700 hover:underline">전체 순위 보기 ▾</button>
         </div>
+        <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="font-extrabold text-slate-800"><i class="fa-solid fa-user text-indigo-500 mr-2"></i>기억력 카드 혼자 플레이 명예의 전당 TOP 5</h3><span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg">보통 4×4 · 학급별 최고 기록</span></div>
+          <p id="memory-solo-leaderboard-status" class="text-xs text-slate-500">Firebase 연결을 확인하는 중입니다.</p>
+          <div id="memory-solo-leaderboard" class="space-y-2 text-sm"></div>
+          <button type="button" onclick="toggleGameRanking('memory-solo')" id="ranking-toggle-memory-solo" class="text-xs font-extrabold text-indigo-700 hover:underline">전체 순위 보기 ▾</button>
+        </div>
         <div class="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200 space-y-4">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
             <div class="border border-violet-200 bg-violet-50 rounded-2xl p-4 space-y-2">
@@ -2035,13 +2041,15 @@
     // Memory Match: self-contained game. Other game logic is unchanged.
     const memorySymbols=['🍎','🚀','🐱','⭐','🎸','⚽','🌈','🦋','🐼','🍀'];
     let memoryGame=null, memoryTick=null, memoryFlipTimer=null, memoryScoresRef=null, memoryLatestScores=[];
-    const gameRankingExpanded={memory:false,'clickrace-leaderboard-body':false,'reaction-leaderboard-body':false,'reaction-solo-leaderboard-body':false};
+    let memorySoloScoresRef=null,memoryLatestSoloScores=[];
+    const gameRankingExpanded={'memory-solo':false,memory:false,'clickrace-leaderboard-body':false,'reaction-leaderboard-body':false,'reaction-solo-leaderboard-body':false};
     function toggleGameRanking(id){
       gameRankingExpanded[id]=!gameRankingExpanded[id];
       const btn=document.getElementById('ranking-toggle-'+id);
       if(btn)btn.textContent=gameRankingExpanded[id]?'TOP 5만 보기 ▴':'전체 순위 보기 ▾';
       const box=document.getElementById('ranking-scroll-'+id);
       if(box){box.style.maxHeight=gameRankingExpanded[id]?'300px':'';box.style.overflowY=gameRankingExpanded[id]?'auto':'';}
+      if(id==='memory-solo'){const el=document.getElementById('memory-solo-leaderboard');if(el){el.style.maxHeight=gameRankingExpanded['memory-solo']?'300px':'';el.style.overflowY=gameRankingExpanded['memory-solo']?'auto':'';}memoryRenderSoloScores(memoryLatestSoloScores);}
       if(id==='memory'){const el=document.getElementById('memory-leaderboard');if(el){el.style.maxHeight=gameRankingExpanded.memory?'300px':'';el.style.overflowY=gameRankingExpanded.memory?'auto':'';}memoryRenderScores(memoryLatestScores);}
       if(id==='clickrace-leaderboard-body')renderClickRaceLeaderboard();
       if(id==='reaction-leaderboard-body')renderReactionLeaderboard();
@@ -2155,7 +2163,7 @@
         if(g.matched.size===g.cards.length/2){
           g.finished=true;g.elapsed=performance.now()-g.start;clearInterval(memoryTick);memoryTick=null;
           document.getElementById('memory-status').textContent='🎉 성공! '+(g.elapsed/1000).toFixed(1)+'초 · '+g.moves+'회 시도';
-          if(g.difficulty==='normal'){memorySaveScore(g);if(memoryScoreMode==='battle')memorySubmitBattle(g);}
+          if(g.difficulty==='normal'){memorySaveScore(g);if(memoryScoreMode==='solo')memorySaveSoloScore(g);if(memoryScoreMode==='battle')memorySubmitBattle(g);}
           else document.getElementById('memory-status').textContent+=' · 연습 모드는 공식 기록에서 제외됩니다.';
         }
       }else{
@@ -2184,6 +2192,50 @@
         row.append(name,score);el.appendChild(row);
       });
     }
+    function memoryRenderSoloScores(items){
+      memoryLatestSoloScores=items;
+      const el=document.getElementById('memory-solo-leaderboard');if(!el)return;
+      el.replaceChildren();
+      if(!items.length){el.textContent='아직 등록된 혼자 플레이 기록이 없습니다.';return;}
+      items.slice(0,gameRankingExpanded['memory-solo']?30:5).forEach((item,i)=>{
+        const row=document.createElement('div');row.className='flex justify-between gap-3 rounded-xl bg-slate-50 p-3 font-bold';
+        const name=document.createElement('span');name.textContent=(i+1)+'위 · '+item.className;
+        const score=document.createElement('span');score.textContent=(Number(item.ms)/1000).toFixed(2)+'초 · '+Number(item.moves||0)+'회';
+        row.append(name,score);el.appendChild(row);
+      });
+    }
+    function memoryAttachSoloScores(){
+      if(memorySoloScoresRef||!firebaseReady||!firebaseAuth.currentUser)return;
+      memorySoloScoresRef=firebaseDb.ref('common/soloMemoryScores');
+      memorySoloScoresRef.on('value',snap=>{
+        memoryRenderSoloScores(memoryScoreItems(snap.val()));
+        document.getElementById('memory-solo-leaderboard-status').textContent='Firebase 실시간 혼자 플레이 기록';
+      },err=>{
+        document.getElementById('memory-solo-leaderboard-status').textContent='기록을 읽을 수 없습니다. Firebase 규칙에 soloMemoryScores를 추가해 주세요.';
+        console.warn('기억력 혼자 플레이 순위 수신 실패',err);
+      });
+    }
+    async function memorySaveSoloScore(g){
+      if(!firebaseReady||!firebaseAuth.currentUser){
+        if(memoryGame===g)document.getElementById('memory-status').textContent+=' · 혼자 플레이 기록 저장 불가: Firebase 미연결';
+        return;
+      }
+      const className=String(state.className||'미지정 학급').slice(0,30);
+      const entry={className,ms:Math.round(g.elapsed),moves:g.moves,date:new Date().toISOString().slice(0,10)};
+      try{
+        const result=await firebaseDb.ref('common/soloMemoryScores').transaction(current=>{
+          const rows=memoryScoreItems(current);
+          const old=rows.find(x=>x.className===className);
+          if(old&&(Number(old.ms)<entry.ms||(Number(old.ms)===entry.ms&&Number(old.moves)<=entry.moves)))return;
+          return {items:rows.filter(x=>x.className!==className).concat(entry)
+            .sort((a,b)=>Number(a.ms)-Number(b.ms)||Number(a.moves)-Number(b.moves)).slice(0,30)};
+        },undefined,false);
+        if(memoryGame===g)document.getElementById('memory-status').textContent+=result.committed?' · 혼자 플레이 명예의 전당 저장 완료':' · 혼자 플레이 기존 최고 기록 유지';
+      }catch(e){
+        console.warn('기억력 혼자 플레이 기록 저장 실패',e);
+        if(memoryGame===g)document.getElementById('memory-status').textContent+=' · 혼자 플레이 기록 저장 실패 (Firebase 규칙 확인)';
+      }
+    }
     function memoryAttachScores(){
       if(memoryScoresRef||!firebaseReady||!firebaseAuth.currentUser)return;
       memoryScoresRef=firebaseDb.ref('common/memoryGameScores');
@@ -2211,8 +2263,8 @@
     }
     window.addEventListener('DOMContentLoaded',()=>{
       memoryNewGame();
-      firebaseAuth.onAuthStateChanged(user=>{if(user)setTimeout(memoryAttachScores,200);});
-      setTimeout(memoryAttachScores,1500);
+      firebaseAuth.onAuthStateChanged(user=>{if(user){setTimeout(memoryAttachScores,200);setTimeout(memoryAttachSoloScores,200);}});
+      setTimeout(memoryAttachScores,1500);setTimeout(memoryAttachSoloScores,1500);
     });
 
 
