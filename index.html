@@ -752,6 +752,18 @@
         </div>
       </div>
 
+      <!-- Solo leaderboard is independent of class-versus-class rankings. -->
+      <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3 gap-2">
+          <h3 class="text-base font-extrabold text-slate-800"><i class="fa-solid fa-bullseye text-indigo-500 mr-2"></i> 혼자 플레이 명예의 전당 TOP 5</h3>
+          <span class="text-[11px] bg-indigo-100 text-indigo-800 font-extrabold px-2.5 py-1 rounded-lg">학급별 3회 평균 최고 기록</span>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left text-xs sm:text-sm">
+          <thead><tr class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200"><th class="p-3 text-center w-14">순위</th><th class="p-3">학급</th><th class="p-3 text-right">최고 기록</th><th class="p-3 text-center">날짜</th></tr></thead>
+          <tbody id="reaction-solo-leaderboard-body" class="divide-y divide-slate-100 font-bold text-slate-700"></tbody>
+        </table></div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-5 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between space-y-5">
           <div>
@@ -1632,6 +1644,10 @@
           renderReactionLeaderboard();
         };
         trackFirebaseListener(reactionScoreRef, 'value', reactionScoreCallback);
+        trackFirebaseListener(firebaseDb.ref('common/soloReactionScores'),'value',snap=>{
+          soloReactionScores=snap.exists()?normalizeReactionScores(snap.val()):[];
+          renderSoloReactionLeaderboard();
+        });
 
         // Event channel is used only for transient calls/test signals. Old events are never replayed as new alerts.
         const academicCallback = snap => {
@@ -2640,6 +2656,11 @@
         if (mine) mine.innerText = `${avg} ms 평균`;
         if (msg) msg.innerText = `🎯 혼자 플레이 종료! 3라운드 평균 ${avg}ms · 다시 하려면 '혼자 플레이'를 누르세요.`;
         setReactionStatus('혼자 플레이 종료', 'indigo');
+        // Record a completed three-round solo average, independently of class battles.
+        saveSoloReactionClassBest(state.className, {ms:avg}).catch(e=>{
+          console.error('Solo reaction leaderboard save failed:',e);
+          showToast('혼자 플레이 기록을 Firebase에 저장하지 못했습니다.',true);
+        });
       }
     }
 
@@ -3042,6 +3063,37 @@
         next.sort((a, b) => Number(a.ms) - Number(b.ms));
         return { items: next.slice(0, 30) };
       });
+    }
+
+    let soloReactionScores=[];
+    async function saveSoloReactionClassBest(className,result){
+      if(!className || !result || !Number.isFinite(result.ms))return;
+      if(!firebaseAuth.currentUser) await firebaseAuth.signInAnonymously();
+      const ref=firebaseDb.ref('common/soloReactionScores');
+      const now=new Date();
+      const date=`${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      await ref.transaction(current=>{
+        const scores=normalizeReactionScores(current);
+        const previous=scores.find(x=>x&&x.className===className);
+        const next=scores.filter(x=>x&&x.className!==className);
+        if(!previous||Number(result.ms)<Number(previous.ms))next.push({className,ms:Math.round(result.ms),date});
+        else next.push(previous);
+        next.sort((a,b)=>Number(a.ms)-Number(b.ms));
+        return {items:next.slice(0,30)};
+      });
+    }
+    function renderSoloReactionLeaderboard(){
+      const tbody=document.getElementById('reaction-solo-leaderboard-body');
+      if(!tbody)return;
+      const scores=normalizeReactionScores(soloReactionScores).filter(x=>x&&x.className&&Number.isFinite(x.ms))
+        .sort((a,b)=>a.ms-b.ms).slice(0,5);
+      if(!scores.length){tbody.innerHTML='<tr><td colspan="4" class="p-6 text-center text-slate-400 font-medium">아직 등록된 혼자 플레이 기록이 없습니다.</td></tr>';return;}
+      tbody.innerHTML=scores.map((item,i)=>{
+        const rank=['🥇 1위','🥈 2위','🥉 3위'][i]||`${i+1}위`;
+        // Do not insert user-controlled class names as HTML.
+        const safe=String(item.className).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        return `<tr class="hover:bg-slate-50 transition"><td class="p-3 text-center font-black">${rank}</td><td class="p-3 font-extrabold text-slate-800">${safe}</td><td class="p-3 text-right font-black text-indigo-700 text-base">${Math.round(item.ms)}ms</td><td class="p-3 text-center text-slate-400 text-xs">${item.date||'-'}</td></tr>`;
+      }).join('');
     }
 
     function renderReactionLeaderboard() {
