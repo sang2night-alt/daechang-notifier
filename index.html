@@ -311,6 +311,23 @@
     }
 
 
+    /* Notifier cards: preserve user-defined DOM order and column spans. */
+    #card-grid > .grid-item { min-width:0; }
+    #classschedule-today { overflow-y:auto; min-height:0; }
+    @media (min-width:900px) and (orientation:landscape) {
+      #card-grid {
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        grid-auto-flow:row dense;
+        grid-auto-rows:minmax(130px,auto);
+        gap:clamp(12px,1.4vw,22px);
+        min-height:max(570px,calc(100dvh - 170px));
+        align-content:stretch;
+      }
+      #card-grid > .col-span-1 { grid-column:span 1 / span 1; }
+      #card-grid > .col-span-2 { grid-column:span 2 / span 2; }
+      #card-grid > #card-todo #todo-list-display { max-height:calc(100dvh - 355px); }
+    }
     /* Click Race: lock touch scrolling only while the 15-second game is active */
     html.clickrace-scroll-locked,
     body.clickrace-scroll-locked {
@@ -383,6 +400,7 @@
         <button id="tab-btn-notifier" onclick="switchTab('notifier')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold bg-white text-indigo-700 shadow transition flex items-center">
           <i class="fa-solid fa-bullhorn mr-1.5"></i> 스마트 알리미
         </button>
+        <button id="tab-btn-classschedule" onclick="switchTab('classschedule')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center"><i class="fa-solid fa-calendar-check mr-1.5"></i> 우리반 스케줄</button>
         <button id="tab-btn-clock" onclick="switchTab('clock')" class="px-3.5 py-2 text-xs sm:text-sm rounded-xl font-bold text-indigo-100 hover:bg-indigo-700/80 transition flex items-center">
           <i class="fa-solid fa-clock mr-1.5"></i> 시계
         </button>
@@ -412,7 +430,7 @@
 
     <!-- VIEW 1: SMART NOTIFIER DASHBOARD -->
     <section id="view-notifier" class="space-y-6">
-      <div id="card-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div id="card-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         <!-- CARD 1: TIMETABLE -->
         <div data-id="timetable" id="card-timetable" class="grid-item col-span-1 bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md flex flex-col justify-between">
@@ -476,43 +494,39 @@
           </div>
         </div>
 
-        <!-- CARD 3: PRAISE THERMOMETER -->
-        <div data-id="praise" id="card-praise" class="grid-item col-span-1 bg-white rounded-3xl p-5 shadow-sm border border-slate-200 hover:shadow-md flex flex-col justify-between">
-          <div>
-            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
-              <div class="flex items-center space-x-2">
-                <span class="drag-handle text-slate-300 hover:text-slate-500" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span>
-                <h3 class="font-extrabold text-base text-slate-800 flex items-center">
-                  <i class="fa-solid fa-temperature-half text-rose-500 mr-2"></i> 우리반 칭찬 온도계
-                </h3>
-              </div>
-              <div class="flex items-center space-x-1">
-                <button onclick="changeCardSize('card-praise', 'col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 font-bold">1열</button>
-                <button onclick="changeCardSize('card-praise', 'col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 font-bold">2열</button>
-              </div>
-            </div>
-
-            <div class="space-y-4 my-2">
-              <div class="flex items-baseline justify-between">
-                <span class="text-xs font-bold text-slate-500">현재 목표 달성도</span>
-                <span class="text-3xl font-black text-rose-600"><span id="praise-temp-display">75</span>°C</span>
-              </div>
-
-              <div class="w-full bg-slate-100 rounded-full h-5 p-1 border border-slate-200 overflow-hidden shadow-inner">
-                <div id="praise-bar-display" class="bg-gradient-to-r from-amber-400 via-rose-500 to-pink-500 h-full rounded-full transition-all duration-700 shadow" style="width: 75%;"></div>
-              </div>
-
-              <div class="bg-rose-50 border border-rose-100 rounded-2xl p-3 text-center">
-                <p class="text-xs font-extrabold text-rose-800" id="praise-msg-display">목표 달성 시 학급 보상 지급!</p>
-              </div>
-            </div>
+        <!-- Compact praise display; existing teacher controls and data IDs are preserved -->
+        <div data-id="praise" id="card-praise" class="grid-item col-span-1 md:col-span-2 bg-white rounded-2xl p-3 shadow-sm border border-slate-200">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="drag-handle text-slate-300" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span>
+            <h3 class="font-extrabold text-sm text-slate-800"><i class="fa-solid fa-temperature-half text-rose-500 mr-2"></i>우리반 칭찬 온도계</h3>
+            <div class="flex-1 min-w-[100px] bg-slate-100 rounded-full h-3 overflow-hidden"><div id="praise-bar-display" class="bg-gradient-to-r from-amber-400 to-rose-500 h-full rounded-full transition-all duration-700" style="width:75%"></div></div>
+            <span class="text-2xl font-black text-rose-600 whitespace-nowrap"><span id="praise-temp-display">75</span>°C</span>
           </div>
-
-          <div class="mt-4 pt-3 border-t border-slate-100 text-right">
-            <span class="text-[11px] text-slate-400 font-medium">선생님이 스티커를 부여하면 온도가 올라갑니다 🔥</span>
+          <span id="praise-msg-display" class="sr-only"></span>
+        </div>
+        <!-- Per-class dated schedule -->
+        <div data-id="classschedule" id="card-classschedule" class="grid-item col-span-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+          <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+            <div class="flex items-center gap-2"><span class="drag-handle text-slate-300 hover:text-slate-500" title="드래그하여 위치 이동"><i class="fa-solid fa-grip-vertical"></i></span><h3 class="font-extrabold text-base"><i class="fa-solid fa-calendar-check text-indigo-600 mr-2"></i>우리반 스케줄</h3></div>
+            <div class="flex items-center gap-1"><button type="button" onclick="changeCardSize('card-classschedule','col-span-1')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">1열</button><button type="button" onclick="changeCardSize('card-classschedule','col-span-2')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 font-bold">2열</button><button type="button" onclick="switchTab('classschedule')" class="text-xs font-extrabold bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl">날짜별 관리 <i class="fa-solid fa-arrow-right ml-1"></i></button></div>
           </div>
+          <div id="classschedule-today" class="text-sm text-slate-600"></div>
         </div>
 
+      </div>
+    </section>
+
+    <section id="view-classschedule" class="hidden space-y-4">
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200">
+        <h2 class="text-xl font-black mb-1"><i class="fa-solid fa-calendar-check text-indigo-600 mr-2"></i>우리반 스케줄</h2>
+        <p class="text-xs text-slate-500 mb-4"><span id="classschedule-class-label"></span> 날짜별 해야 할 일을 등록하고 관리합니다. 학교 공통 학사일정과 별개입니다.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] gap-2">
+          <input id="classschedule-date" type="date" aria-label="스케줄 날짜" class="border border-slate-300 rounded-xl p-3 text-sm" onchange="renderClassSchedule()">
+          <input id="classschedule-title" type="text" maxlength="120" placeholder="해야 할 일 입력" aria-label="해야 할 일" class="border border-slate-300 rounded-xl p-3 text-sm" onkeydown="if(event.key==='Enter')addClassSchedule()">
+          <button onclick="addClassSchedule()" class="bg-indigo-600 text-white rounded-xl px-5 py-3 font-bold text-sm">+ 등록</button>
+        </div>
+        <div id="classschedule-status" class="text-xs text-slate-500 mt-3" aria-live="polite"></div>
+        <div id="classschedule-list" class="space-y-2 mt-4"></div>
       </div>
     </section>
 
@@ -1186,7 +1200,8 @@
       cardSizes: {
         timetable: "col-span-1",
         todo: "col-span-1",
-        praise: "col-span-1"
+        praise: "col-span-1",
+        classschedule: "col-span-1"
       },
       moodLogs: [],
       clickRaceScores: [
@@ -1449,6 +1464,7 @@
         }
         if (myGeneration !== firebaseSyncGeneration) return;
         firebaseReady = true;
+        attachClassSchedule();
         initReactionChallengeListener();
 
         const classRef = firebaseDb.ref(`classes/${classKey}`);
@@ -1867,7 +1883,7 @@
 
       state.currentTab = tab;
       
-      ['notifier', 'clock', 'meal', 'mood', 'gamecenter', 'academic', 'teacher'].forEach(t => {
+      ['notifier', 'classschedule', 'clock', 'meal', 'mood', 'gamecenter', 'academic', 'teacher'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (view) view.classList.add('hidden');
 
@@ -3959,6 +3975,101 @@
       }
     }
 
+    // CLASS SCHEDULE: isolated data path; existing class state and academic schedule untouched.
+    let classScheduleItems = {};
+    let classSchedulePending = {};
+    let classScheduleSaveQueue = Promise.resolve();
+    let classScheduleRef = null;
+    let classScheduleCallback = null;
+    let classScheduleClassKey = '';
+    function classScheduleLocalKey() { return `daechang_class_schedule_${getClassKey()}`; }
+    function loadClassScheduleLocal() {
+      try { const v = JSON.parse(localStorage.getItem(classScheduleLocalKey()) || '{}'); classScheduleItems = v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
+      catch (_) { classScheduleItems = {}; }
+      renderClassSchedule();
+    }
+    function saveClassScheduleLocal() {
+      try { localStorage.setItem(classScheduleLocalKey(), JSON.stringify(classScheduleItems)); } catch (_) {}
+    }
+    function setClassScheduleStatus(message) { const e=document.getElementById('classschedule-status'); if(e)e.textContent=message; }
+    function attachClassSchedule() {
+      if(classScheduleRef && classScheduleCallback) classScheduleRef.off('value',classScheduleCallback);
+      classScheduleRef=null; classScheduleCallback=null;
+      classScheduleClassKey=getClassKey();
+      classSchedulePending={};
+      classScheduleSaveQueue=Promise.resolve();
+      loadClassScheduleLocal();
+      if(!firebaseReady || !firebaseAuth.currentUser) {setClassScheduleStatus('이 기기에 임시 저장 중 · 실시간 연결 대기');return;}
+      const key=classScheduleClassKey;
+      classScheduleRef=firebaseDb.ref(`classSchedules/${key}`);
+      classScheduleCallback=snap=>{
+        if(key!==getClassKey())return;
+        classScheduleItems={...(snap.val() || {}),...classSchedulePending};
+        Object.keys(classSchedulePending).forEach(id=>{if(classSchedulePending[id]===null)delete classScheduleItems[id];});
+        saveClassScheduleLocal();renderClassSchedule();
+        setClassScheduleStatus('학급별 실시간 동기화 중');
+      };
+      classScheduleRef.on('value',classScheduleCallback,err=>setClassScheduleStatus('스케줄 서버 접근 불가 · 이 기기에만 저장됩니다 (Firebase 규칙 확인 필요)'));
+    }
+    async function persistClassSchedule() {
+      saveClassScheduleLocal();renderClassSchedule();
+      if(!classScheduleRef || classScheduleClassKey!==getClassKey()) {setClassScheduleStatus('이 기기에만 저장됨 · 연결 대기');return;}
+      const pending={...classSchedulePending};
+      const ref=classScheduleRef;
+      classScheduleSaveQueue=classScheduleSaveQueue.catch(()=>{}).then(()=>ref.update(pending));
+      try {await classScheduleSaveQueue;Object.keys(pending).forEach(id=>{if(JSON.stringify(classSchedulePending[id])===JSON.stringify(pending[id]))delete classSchedulePending[id];});setClassScheduleStatus('학급별 실시간 저장 완료');}
+      catch(err) {console.warn('Class schedule sync failed:',err);setClassScheduleStatus('서버 저장 실패 · 이 기기에만 저장됨 (Firebase 규칙 확인 필요)');}
+    }
+    function addClassSchedule() {
+      const date=document.getElementById('classschedule-date').value;
+      const input=document.getElementById('classschedule-title');
+      const title=input.value.trim();
+      if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !title){showToast('날짜와 할 일을 입력해주세요.',true);return;}
+      const id=`s${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+      classScheduleItems[id]={date,title,done:false};classSchedulePending[id]={...classScheduleItems[id]};input.value='';persistClassSchedule();
+    }
+    function updateClassSchedule(id,action) {
+      const item=classScheduleItems[id];if(!item)return;
+      if(action==='delete') {if(!confirm('이 스케줄을 삭제하시겠습니까?'))return;delete classScheduleItems[id];}
+      if(action==='toggle')item.done=!item.done;
+      if(action==='edit') {const title=prompt('할 일 수정',item.title);if(title===null)return;if(!title.trim())return;item.title=title.trim().slice(0,120);}
+      classSchedulePending[id]=classScheduleItems[id]?{...classScheduleItems[id]}:null;
+      persistClassSchedule();
+    }
+    function renderClassSchedule() {
+      const input=document.getElementById('classschedule-date');if(!input)return;
+      if(!input.value)input.value=getLocalDateKey();
+      const date=input.value;
+      const items=Object.entries(classScheduleItems).filter(([,v])=>v && v.date===date).sort((a,b)=>a[0].localeCompare(b[0]));
+      const label=document.getElementById('classschedule-class-label');if(label)label.textContent=`${state.className} · `;
+      const list=document.getElementById('classschedule-list');
+      if(list){list.replaceChildren();if(!items.length){const p=document.createElement('p');p.className='text-sm text-slate-400 py-4';p.textContent='선택한 날짜에 등록된 할 일이 없습니다.';list.append(p);}
+      items.forEach(([id,item])=>{const row=document.createElement('div');row.className='flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3 border border-slate-200';
+        const check=document.createElement('input');check.type='checkbox';check.checked=!!item.done;check.setAttribute('aria-label','완료');check.onchange=()=>updateClassSchedule(id,'toggle');
+        const title=document.createElement('span');title.className='flex-1 min-w-[120px] text-sm font-semibold'+(item.done?' line-through text-slate-400':'');title.textContent=item.title;
+        const edit=document.createElement('button');edit.className='text-xs font-bold text-indigo-600 px-2 py-1';edit.textContent='수정';edit.onclick=()=>updateClassSchedule(id,'edit');
+        const del=document.createElement('button');del.className='text-xs font-bold text-rose-600 px-2 py-1';del.textContent='삭제';del.onclick=()=>updateClassSchedule(id,'delete');row.append(check,title,edit,del);list.append(row);});}
+      const today=document.getElementById('classschedule-today');
+      if(today){
+        today.replaceChildren();
+        const current=getLocalDateKey();
+        const upcoming=Object.values(classScheduleItems).filter(v=>v && v.date>=current).sort((a,b)=>a.date.localeCompare(b.date));
+        if(!upcoming.length){today.textContent='등록된 오늘·예정 스케줄이 없습니다.';}
+        else upcoming.slice(0,12).forEach(v=>{
+          const p=document.createElement('p');
+          p.className='py-2 border-b border-slate-100 text-sm'+(v.done?' line-through text-slate-400':'');
+          const date=document.createElement('span');date.className='text-xs font-extrabold text-indigo-600 mr-2';date.textContent=v.date===current?'오늘':v.date.slice(5);
+          const title=document.createElement('span');title.textContent=(v.done?'✓ ':'• ')+v.title;
+          p.append(date,title);today.append(p);
+        });
+        if(upcoming.length>12){const p=document.createElement('p');p.className='text-xs text-slate-500 mt-2';p.textContent=`외 ${upcoming.length-12}개`;today.append(p);}
+      }
+    }
+    const originalSelectClassForSchedule=selectClass;
+    selectClass=function(...args){const result=originalSelectClassForSchedule.apply(this,args);attachClassSchedule();return result;};
+    window.addEventListener('DOMContentLoaded',()=>{loadClassScheduleLocal();setTimeout(attachClassSchedule,1800);});
+    window.addEventListener('pagehide',()=>{if(classScheduleRef&&classScheduleCallback)classScheduleRef.off('value',classScheduleCallback);});
+
     // DRAG AND DROP HANDLER
     function initDragAndDrop() {
       const grid = document.getElementById('card-grid');
@@ -4050,6 +4161,11 @@
       state.isTeacherAuthenticated = false;
       if (savedClass) state.className = savedClass;
       restoreCardOrder();
+      const scheduleCard = document.getElementById('card-classschedule');
+      if (scheduleCard) {
+        scheduleCard.classList.remove('col-span-1','col-span-2');
+        scheduleCard.classList.add(state.cardSizes.classschedule === 'col-span-2' ? 'col-span-2' : 'col-span-1');
+      }
       renderAll();
       initDragAndDrop();
       updateDateTime();
