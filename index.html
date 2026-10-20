@@ -2258,6 +2258,7 @@
         const expiry=memoryServerNow()+10000;
         await challengeRef.set({roomId:id,fromClass:state.className,senderId:clientId,createdAt:firebase.database.ServerValue.TIMESTAMP,expiresAt:expiry,status:'open'});
         await memoryJoinRoom(id,'p1');
+        switchTab('gamecenter');
         memoryBattleInfo('도전장 발송! 10초 동안 수락을 기다립니다.');
         setTimeout(async()=>{
           try{
@@ -2356,7 +2357,8 @@
         await memoryJoinRoom(c.roomId,'p2');
         switchTab('gamecenter');
         switchGameCenter('memory');
-        memoryBattleInfo('대전 연결 완료 · 상대 학급과 번갈아 카드를 뒤집으세요.');
+        // Firebase 수신기가 현재 차례를 표시하도록 두며 고정 안내문으로 덮어쓰지 않는다.
+        if(memoryBattleRoom)memoryBattleRoomListener({val:()=>memoryBattleRoom});
         showToast('기억력 카드 학급 대전에 연결되었습니다!');
       }catch(e){
         console.error('기억력 도전장 수락 오류:',e);
@@ -2369,8 +2371,10 @@
     async function memoryJoinRoom(id,slot){
       if(memoryBattleRef)memoryBattleRef.off('value',memoryBattleRoomListener);
       memoryBattleRoomId=id;memoryBattleSlot=slot;memoryBattleRef=firebaseDb.ref('memoryRooms/'+id);memoryScoreMode='battle';memoryActiveSeed=null;
-      memoryBattleRef.on('value',memoryBattleRoomListener,e=>console.warn('기억력 대전 동기화 실패',e));
+      switchTab('gamecenter');
       switchGameCenter('memory');
+      memoryBattleInfo('대전 방 연결 중...');
+      memoryBattleRef.on('value',memoryBattleRoomListener,e=>{console.warn('기억력 대전 동기화 실패',e);memoryBattleInfo('대전 데이터 수신 실패: '+(e.code||e.message));});
     }
     function memoryBattleRoomListener(snap){
       const room=snap.val();
