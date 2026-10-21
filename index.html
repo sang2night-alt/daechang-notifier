@@ -550,6 +550,30 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     body.auto-clock-presentation #digital-clock-date { margin-top: clamp(5px, 1.4dvh, 18px); font-size: clamp(1.2rem, min(3vw, 4dvh), 2.8rem); }
     body.auto-clock-presentation #clock-presentation-start { display: none !important; }
 
+    /* Fullscreen flip: enlarge the complete three-tile clock, not just its text.
+       The viewport-height cap leaves room for the date and marquee. */
+    body.auto-clock-presentation #digital-clock-time.flat-flip-clock {
+      gap: clamp(4px, 1vw, 16px);
+      width: 100%;
+      max-width: 100%;
+    }
+    body.auto-clock-presentation #digital-clock-time .flat-flip-unit {
+      flex: 0 0 auto;
+      width: min(27vw, 39dvh);
+      height: min(27vw, 39dvh);
+      border-radius: clamp(12px, 2vw, 30px);
+    }
+    body.auto-clock-presentation #digital-clock-time .flat-flip-unit span {
+      font-size: min(18vw, 29dvh);
+      line-height: 1;
+    }
+    body.auto-clock-presentation #digital-clock-time .flat-flip-colon {
+      font-size: min(6vw, 13dvh);
+    }
+    /* D-DAY editing belongs to normal mode only; data and form remain intact. */
+    body.auto-clock-presentation #dday-register-panel { display: none !important; }
+
+
   </style>
 
   <!-- PWA -->
