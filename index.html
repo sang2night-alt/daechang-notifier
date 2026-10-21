@@ -422,6 +422,33 @@
 @keyframes memory-turn { 0% {transform:rotateY(0deg) scale(1)} 48% {transform:rotateY(90deg) scale(.93)} 100% {transform:rotateY(0deg) scale(1)} }
 @keyframes memory-turn-back { 0% {transform:rotateY(0deg)} 48% {transform:rotateY(-90deg) scale(.93)} 100% {transform:rotateY(0deg)} }
 @media(prefers-reduced-motion:reduce){.memory-tile.memory-revealed,.memory-tile.memory-concealed{animation:none}}
+
+/* 기억력 게임판: 카드 한 장이 아니라 전체 판의 외곽 크기를 통일합니다.
+   난이도별 행 개수만 바뀌고 전체 판은 태블릿 화면 안에 머뭅니다. */
+#memory-board.memory-uniform-board {
+  --memory-rows: 4;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(var(--memory-rows), minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: clamp(5px, 0.8dvh, 9px);
+  width: min(100%, 480px);
+  height: min(54dvh, 430px);
+  max-width: 100%;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+#memory-board.memory-uniform-board .memory-tile {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto !important;
+  overflow: hidden;
+}
+@media (max-height: 650px) and (orientation: landscape) {
+  #memory-board.memory-uniform-board { height: min(51dvh, 340px); width: min(100%, 440px); gap: 5px; }
+}
 </style>
 
   <!-- PWA -->
@@ -962,13 +989,13 @@
             </div>
           </div>
           <div class="flex flex-wrap items-end gap-3">
-            <label class="text-xs font-bold text-slate-600">난이도<select id="memory-difficulty" onchange="if(memoryScoreMode==='battle'){this.value='normal';return;}memoryNewGame()" class="block mt-1 border border-slate-300 rounded-xl p-2.5 font-bold text-sm"><option value="easy">쉬움 · 3×4</option><option value="normal" selected>보통 · 4×4 (공식)</option><option value="hard">어려움 · 4×5</option></select></label>
+            <label class="text-xs font-bold text-slate-600">난이도<select id="memory-difficulty" onchange="if(memoryScoreMode==='battle'){this.value='normal';return;}memoryNewGame()" class="block mt-1 border border-slate-300 rounded-xl p-2.5 font-bold text-sm"><option value="easy">쉬움 · 4×3</option><option value="normal" selected>보통 · 4×4 (공식)</option><option value="hard">어려움 · 4×5</option></select></label>
             <button onclick="if(memoryScoreMode==='battle'){showToast('대전 중에는 새 게임을 시작할 수 없습니다.',true);return;}memoryNewGame()" class="bg-violet-600 text-white font-extrabold px-5 py-2.5 rounded-xl text-sm"><i class="fa-solid fa-rotate-right mr-1"></i>새 게임</button>
             <div class="flex-1"></div>
             <div class="text-sm font-bold text-slate-600">시간 <strong id="memory-time" class="text-lg text-violet-700 tabular-nums">0.0초</strong> · 시도 <strong id="memory-moves">0</strong>회 · <strong id="memory-pairs">0/8쌍</strong></div>
           </div>
           <p id="memory-status" role="status" aria-live="polite" class="text-sm font-bold text-slate-600">카드를 누르면 타이머가 시작됩니다.</p>
-          <div id="memory-board" class="grid grid-cols-4 gap-2 sm:gap-3 max-w-2xl mx-auto" aria-label="기억력 카드 게임판"></div>
+          <div id="memory-board" class="grid grid-cols-4 memory-uniform-board" aria-label="기억력 카드 게임판"></div>
         </div>
       </section>
     </section>
@@ -2183,15 +2210,15 @@
     function memoryNewGame(){
       clearInterval(memoryTick);clearTimeout(memoryFlipTimer);memoryTick=null;memoryFlipTimer=null;
       const difficulty=document.getElementById('memory-difficulty').value;
-      const config={easy:[3,6],normal:[4,8],hard:[5,10]}[difficulty];
+      const config={easy:[4,6],normal:[4,8],hard:[4,10]}[difficulty];
       const pool=memoryScoreMode==='battle'&&memoryActiveSeed!=null?memorySeededShuffle(memoryActiveSeed,config[1]):memorySymbols.slice(0,config[1]).flatMap((_,i)=>[i,i]);
       if(memoryScoreMode!=='battle'){for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}}
       memoryGame={difficulty,columns:config[0],cards:pool,open:[],matched:new Set(),moves:0,start:0,elapsed:0,locked:false,finished:false,token:(memoryGame?memoryGame.token+1:1)};
-      const board=document.getElementById('memory-board');board.style.gridTemplateColumns='repeat('+config[0]+',minmax(0,1fr))';
+      const board=document.getElementById('memory-board');board.style.gridTemplateColumns='repeat('+config[0]+',minmax(0,1fr))';board.style.setProperty('--memory-rows',String(pool.length/config[0]));
       board.innerHTML='';
       pool.forEach((v,i)=>{
         const btn=document.createElement('button');btn.type='button';btn.dataset.index=i;
-        btn.className='memory-tile min-w-0 aspect-square rounded-2xl bg-indigo-600 text-white text-2xl sm:text-4xl font-black shadow-sm transition-transform active:scale-95 select-none touch-manipulation';
+        btn.className='memory-tile min-w-0 aspect-square rounded-xl bg-indigo-600 text-white text-xl sm:text-2xl font-black shadow-sm transition-transform active:scale-95 select-none touch-manipulation';
         btn.setAttribute('aria-label','가려진 카드 '+(i+1));btn.textContent='?';btn.dataset.face='down';btn.dataset.matched='0';btn.onclick=()=>memoryFlip(i);
         board.appendChild(btn);
       });
