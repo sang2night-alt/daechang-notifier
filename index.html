@@ -328,6 +328,30 @@
       #card-grid > .col-span-2 { grid-column:span 2 / span 2; }
       #card-grid > #card-todo #todo-list-display { max-height:calc(100dvh - 355px); }
     }
+    /* Tablet landscape: reduce spacing only. Never override user-resized card
+       heights or add scrolling/clipping to the cards themselves. */
+    @media (min-width:900px) and (orientation:landscape) and (max-height:950px) {
+      #view-notifier #card-grid { row-gap: 8px; column-gap: 10px; }
+      #view-notifier #card-grid > .grid-item { padding-top: 10px; padding-bottom: 10px; }
+      #view-notifier #card-grid > .grid-item > .flex:first-child { margin-bottom: 6px; }
+      #view-notifier #card-grid > #card-praise .praise-student-field { margin-top: 5px; }
+      #view-notifier #card-grid > #card-praise > p { margin-top: 2px; }
+    }
+    /* Compact only the title/header rows of the smart-notifier cards.
+       No fixed heights, font shrinking, or changes to resize behavior. */
+    @media (min-width:900px) and (orientation:landscape) {
+      #view-notifier #card-timetable > div:first-child > div:first-child,
+      #view-notifier #card-todo > div:first-child > div:first-child {
+        margin-bottom: 7px !important;
+        padding-bottom: 6px !important;
+      }
+      #view-notifier #card-classschedule > div:first-child {
+        margin-bottom: 6px !important;
+        gap: 5px;
+      }
+      #view-notifier #card-praise > div:first-child { gap: 6px; }
+      #view-notifier #card-classschedule > div:first-child button { padding-top: 5px; padding-bottom: 5px; }
+    }
     /* Notifier: leave a safe bottom margin on landscape tablets, without clipping cards. */
     #view-notifier { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
     /* The fixed-position edit button is a direct child of a Tailwind space-y section.
