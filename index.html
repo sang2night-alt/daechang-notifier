@@ -490,6 +490,38 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       background: rgba(30,41,59,.85); color: white;
     }
 
+
+    /* Clock-only presentation: automatic idle mode or explicit clock button. */
+    body.auto-clock-presentation #classroom-digital-clock { padding-block: clamp(6px, 1.2dvh, 18px); }
+    body.auto-clock-presentation .clock-style-switch { margin-bottom: clamp(6px, 1dvh, 14px); }
+    body.auto-clock-presentation .clock-mode-stage { width: 100%; }
+    body.auto-clock-presentation #original-clock-time {
+      font-size: clamp(3rem, min(17.8vw, 30dvh), 17rem);
+      letter-spacing: -.065em;
+    }
+    body.auto-clock-presentation .flat-flip-clock { gap: clamp(3px, .8vw, 15px); }
+    body.auto-clock-presentation .flat-flip-unit {
+      width: min(25.2vw, 27dvh, 23rem);
+      height: min(23.8vw, 31dvh, 21rem);
+      border-radius: clamp(10px, 1.5vw, 25px);
+    }
+    body.auto-clock-presentation .flat-flip-unit span { font-size: min(16.5vw, 25dvh, 15rem); }
+    body.auto-clock-presentation .flat-flip-colon { font-size: min(8vw, 17dvh, 10rem); }
+    body.auto-clock-presentation .dday-clock-panel { max-width: min(95vw, 1450px); }
+    body.auto-clock-presentation .dday-hero { padding: clamp(12px, 2.5dvh, 35px); }
+    body.auto-clock-presentation .dday-title { font-size: clamp(1.5rem, min(4.2vw, 6dvh), 4rem); }
+    body.auto-clock-presentation .dday-number { font-size: clamp(3rem, min(16vw, 26dvh), 14rem); }
+    body.auto-clock-presentation .dday-number.today { font-size: clamp(3rem, min(12vw, 20dvh), 11rem); }
+    body.auto-clock-presentation .dday-date { font-size: clamp(.9rem, 2.4dvh, 1.6rem); }
+    body.auto-clock-presentation #digital-clock-date { margin-top: clamp(5px, 1.4dvh, 18px); font-size: clamp(1.2rem, min(3vw, 4dvh), 2.8rem); }
+    /* Manual entry control is visible only on the ordinary clock tab. */
+    #clock-presentation-start { margin: 0 auto clamp(8px, 1.4dvh, 18px); }
+    body.auto-clock-presentation #clock-presentation-start { display: none !important; }
+    @media (max-width: 640px) {
+      body.auto-clock-presentation .flat-flip-unit { width: min(25vw, 27dvh); height: min(25vw, 30dvh); }
+      body.auto-clock-presentation .flat-flip-unit span { font-size: min(16vw, 24dvh); }
+    }
+
   </style>
 
   <!-- PWA -->
@@ -685,6 +717,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
             <button id="clock-style-flip-btn" class="clock-style-btn" onclick="setClockStyle('flip')"><i class="fa-solid fa-table-cells-large mr-1.5"></i>플립 시계</button>
             <button id="clock-style-dday-btn" class="clock-style-btn" onclick="setClockStyle('dday')"><i class="fa-solid fa-calendar-day mr-1.5"></i>D-DAY</button>
           </div>
+          <button id="clock-presentation-start" type="button" onclick="startManualClockPresentation()" class="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm px-4 py-2 shadow-sm" title="시계 전용 화면으로 전환"><i class="fa-solid fa-expand"></i> 시계 전체화면</button>
           <div class="clock-mode-stage">
             <div id="original-clock-time" class="original-digital-clock hidden" aria-label="현재 시각">00:00:00</div>
             <div id="digital-clock-time" class="flat-flip-clock" aria-label="현재 시각">
@@ -2119,6 +2152,13 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
 
     function enterAutomaticClockPresentation() {
       document.body.classList.add('auto-clock-presentation');
+    }
+
+    function startManualClockPresentation() {
+      // Uses the existing clock-only presentation, without browser fullscreen permission.
+      // The first tap or the floating menu button restores the regular header.
+      enterAutomaticClockPresentation();
+      resetClassroomInactivityTimer();
     }
 
     function switchTab(tab) {
