@@ -1131,7 +1131,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
           <button id="fortress-leave-btn" type="button" onclick="fortressLeaveRoom()" class="hidden bg-slate-600 text-white text-xs font-black px-3 py-2 rounded-lg">대전방 나가기</button>
           <span id="fortress-room-status" class="text-xs font-bold text-slate-600" aria-live="polite">혼자 플레이 중 · AI 상대</span>
         </div>
-        <iframe id="fortress-game-frame" onload="fortressFrameLoaded()" title="앵그리 포트리스" loading="lazy" allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-modals" referrerpolicy="no-referrer" style="display:block;width:100%;height:clamp(560px,77dvh,900px);border:0;border-radius:14px;background:#b9e9ff;overflow:hidden;" srcdoc="&lt;!DOCTYPE html&gt;
+        <iframe id="fortress-game-frame" onload="fortressFrameLoaded()" title="앵그리 포트리스" loading="eager" allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-modals" referrerpolicy="no-referrer" style="display:block;width:100%;height:clamp(560px,77dvh,900px);border:0;border-radius:14px;background:#b9e9ff;overflow:hidden;" srcdoc="&lt;!DOCTYPE html&gt;
 &lt;html lang=&quot;ko&quot;&gt;
 &lt;head&gt;
   &lt;meta charset=&quot;UTF-8&quot;&gt;
@@ -1400,7 +1400,16 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     body.fortress-online .online-waiting-help {display:block}
     .online-waiting-help {display:none;position:absolute;z-index:40;left:50%;top:42%;transform:translate(-50%,-50%);color:white;text-shadow:0 2px 8px black;font-size:clamp(14px,2vw,23px);font-weight:900;text-align:center;pointer-events:none}
     body.fortress-online.online-ready .online-waiting-help {display:none}
-    &lt;/style&gt;
+    
+    /* Stable game viewport even before the async Tailwind stylesheet loads. */
+    html, body {width:100%;height:100%;min-height:0!important;margin:0;overflow:hidden;}
+    body {box-sizing:border-box;display:flex!important;flex-direction:column!important;height:100dvh;min-height:0!important;}
+    body &gt; header {flex:0 0 auto;max-width:100%;box-sizing:border-box;}
+    body &gt; #game-container {display:block;flex:1 1 auto!important;min-height:0!important;height:auto!important;width:100%;box-sizing:border-box;overflow:hidden;}
+    #gameCanvas {display:block;width:100%;height:100%;touch-action:none;}
+    body.fortress-online &gt; #game-container {flex:1 1 auto!important;aspect-ratio:auto!important;height:auto!important;}
+
+  &lt;/style&gt;
 &lt;/head&gt;
 &lt;body class=&quot;min-h-screen flex flex-col justify-between select-none&quot;&gt;
 
@@ -1757,20 +1766,30 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     // ==========================================
     // 2. CANVAS RESIZING &amp; TERRAIN GENERATION
     // ==========================================
+    let fortressLastCanvasWidth=0,fortressLastCanvasHeight=0;
     function resizeCanvas() {
       const container = document.getElementById(&#x27;game-container&#x27;);
+      if (!container || !container.getClientRects().length) return false;
+      const bounds=container.getBoundingClientRect();
+      const newWidth=Math.round(bounds.width),newHeight=Math.round(bounds.height);
+      // Never initialize from hidden/zero-size geometry or artificial fallback values.
+      if(newWidth &lt; 280 || newHeight &lt; 220)return false;
       if(onlineRole){
-        canvas.width=960;canvas.height=600;
-        draw();return;
+        if(canvas.width!==960||canvas.height!==600){canvas.width=960;canvas.height=600;}
+        draw();return true;
       }
-      canvas.width = Math.max(320, container.clientWidth || window.innerWidth || 960);
-      canvas.height = Math.max(360, container.clientHeight || Math.min(window.innerHeight || 600, 700));
+      // Canvas width/height reassignment clears the frame and rebuilds terrain.
+      // Avoid doing so on the same-size resize notification.
+      if(newWidth===fortressLastCanvasWidth &amp;&amp; newHeight===fortressLastCanvasHeight)return true;
+      fortressLastCanvasWidth=newWidth;fortressLastCanvasHeight=newHeight;
+      canvas.width=newWidth;canvas.height=newHeight;
       if(fieldItem){document.getElementById(&#x27;field-item&#x27;).style.left=(canvas.width*.5)+&#x27;px&#x27;;document.getElementById(&#x27;field-item&#x27;).style.top=(canvas.height*.38)+&#x27;px&#x27;;}
       generateTerrain();
       initBgParticles();
       repositionTanks(!positionsInitialized);
       setupCoverRocks();
       draw();
+      return true;
     }
 
     function generateTerrain() {
@@ -3559,23 +3578,36 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     window.fortressRemoteCommand=fortressRemoteCommand;
     window.fortressLeaveOnline=fortressLeaveOnline;
 
-    // DOM이 준비되면 즉시 게임 시작. CDN 이미지/스타일 로딩을 기다리지 않음.
-    let fortressInitialized=false;
+    // Input may initialize early, but world geometry must wait for a visible layout.
+    let fortressInitialized=false,fortressInputReady=false,fortressSizeObserver=null;
     function fortressBoot(){
+      if(!fortressInputReady){
+        fortressInputReady=true;
+        setupTouchEvents();
+        if(typeof ResizeObserver!==&#x27;undefined&#x27;){
+          fortressSizeObserver=new ResizeObserver(()=&gt;{
+            if(!fortressInitialized)fortressBoot();
+            else resizeCanvas();
+          });
+          fortressSizeObserver.observe(document.getElementById(&#x27;game-container&#x27;));
+        }
+      }
       if(fortressInitialized)return;
+      if(!resizeCanvas())return; // iframe/tab is still hidden or not laid out
       fortressInitialized=true;
-      resizeCanvas();
-      setupTouchEvents();
       syncUIWithTurn();
       scheduleFieldItem();
       gameLoop();
       try{window.parent?.fortressFrameLoaded?.()}catch(e){}
     }
-    window.addEventListener(&#x27;resize&#x27;,()=&gt;{if(fortressInitialized)resizeCanvas()});
+    window.fortressRequestResize=()=&gt;{
+      if(!fortressInitialized)fortressBoot();
+      else resizeCanvas();
+    };
+    window.addEventListener(&#x27;resize&#x27;,()=&gt;window.fortressRequestResize());
     if(document.readyState===&#x27;loading&#x27;)document.addEventListener(&#x27;DOMContentLoaded&#x27;,fortressBoot,{once:true});
     else fortressBoot();
-    // iframe 안에 로딩 대기가 있어도 입력이 늦게 잠기지 않도록 보험.
-    window.addEventListener(&#x27;load&#x27;,fortressBoot,{once:true});
+    window.addEventListener(&#x27;load&#x27;,()=&gt;window.fortressRequestResize(),{once:true});
   &lt;/script&gt;
 &lt;/body&gt;
 &lt;/html&gt;"></iframe>
@@ -5408,8 +5440,19 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     }
     function resizeFortressFrame() {
       const frame = document.getElementById('fortress-game-frame');
-      if (!frame) return;
-      try { frame.contentWindow?.dispatchEvent(new Event('resize')); } catch (err) { console.warn('포트리스 크기 동기화 실패',err); }
+      if (!frame || frame.getClientRects().length===0) return;
+      try {
+        if(typeof frame.contentWindow?.fortressRequestResize==='function')frame.contentWindow.fortressRequestResize();
+        else frame.contentWindow?.dispatchEvent(new Event('resize'));
+      } catch (err) { console.warn('포트리스 크기 동기화 실패',err); }
+    }
+    // Observe actual available viewport size, not just the first iframe load event.
+    if(typeof ResizeObserver!=='undefined'){
+      const fortressFrameObserver=new ResizeObserver(()=>{
+        if(activeGameCenterTab==='fortress')requestAnimationFrame(resizeFortressFrame);
+      });
+      const observedFrame=document.getElementById('fortress-game-frame');
+      if(observedFrame)fortressFrameObserver.observe(observedFrame);
     }
     function reloadFortressGame() {
       const frame = document.getElementById('fortress-game-frame');
