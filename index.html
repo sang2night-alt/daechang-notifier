@@ -1121,10 +1121,17 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       <!-- 앵그리 포트리스: isolate its canvas / audio / keyboard handlers from the smart notifier. -->
       <section id="game-view-fortress" class="hidden" aria-label="앵그리 포트리스 게임">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
-          <div class="text-sm font-black text-slate-800"><i class="fa-solid fa-mountain text-emerald-600 mr-2"></i>앵그리 포트리스 <span class="text-xs text-slate-500 font-bold ml-1">AI 대전 · 2인 대전</span></div>
+          <div class="text-sm font-black text-slate-800"><i class="fa-solid fa-mountain text-emerald-600 mr-2"></i>앵그리 포트리스 <span class="text-xs text-slate-500 font-bold ml-1">싱글 · 다른 반 실시간 대전</span></div>
           <button type="button" onclick="reloadFortressGame()" class="text-xs font-extrabold text-slate-600 border border-slate-200 bg-white px-3 py-2 rounded-lg hover:bg-slate-50"><i class="fa-solid fa-rotate-right mr-1"></i>게임 새로고침</button>
         </div>
-        <iframe id="fortress-game-frame" onload="if(activeGameCenterTab==='fortress')resizeFortressFrame()" title="앵그리 포트리스" loading="lazy" allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-modals" referrerpolicy="no-referrer" style="display:block;width:100%;height:clamp(560px,77dvh,900px);border:0;border-radius:14px;background:#b9e9ff;overflow:hidden;" srcdoc="&lt;!DOCTYPE html&gt;
+
+        <div id="fortress-online-menu" class="flex flex-wrap gap-2 items-center mb-3 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+          <button id="fortress-solo-btn" type="button" onclick="fortressChooseSolo()" class="bg-emerald-600 text-white text-xs font-black px-3 py-2 rounded-lg">혼자 플레이 (AI)</button>
+          <button id="fortress-create-btn" type="button" onclick="fortressCreateRoom()" class="bg-indigo-600 text-white text-xs font-black px-3 py-2 rounded-lg">⚔️ 다른 학급에 도전장 보내기</button>
+          <button id="fortress-leave-btn" type="button" onclick="fortressLeaveRoom()" class="hidden bg-slate-600 text-white text-xs font-black px-3 py-2 rounded-lg">대전방 나가기</button>
+          <span id="fortress-room-status" class="text-xs font-bold text-slate-600" aria-live="polite">혼자 플레이 중 · AI 상대</span>
+        </div>
+        <iframe id="fortress-game-frame" onload="fortressFrameLoaded()" title="앵그리 포트리스" loading="lazy" allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-modals" referrerpolicy="no-referrer" style="display:block;width:100%;height:clamp(560px,77dvh,900px);border:0;border-radius:14px;background:#b9e9ff;overflow:hidden;" srcdoc="&lt;!DOCTYPE html&gt;
 &lt;html lang=&quot;ko&quot;&gt;
 &lt;head&gt;
   &lt;meta charset=&quot;UTF-8&quot;&gt;
@@ -1384,7 +1391,16 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       body &gt; header &gt; div:last-child {gap:0 !important;}
     }
 
-  &lt;/style&gt;
+  
+    body.fortress-online #game-container {aspect-ratio:8/5;height:auto!important;flex:0 0 auto!important;min-height:0!important}
+    body.fortress-online #gameCanvas {width:100%;height:100%}
+    body.fortress-online #btn-mode-toggle {display:none!important}
+    body.fortress-online #claim-p1,body.fortress-online #claim-p2{display:none!important}
+    body.fortress-online.fortress-role-p1 #claim-p1,body.fortress-online.fortress-role-p2 #claim-p2{display:inline-flex!important}
+    body.fortress-online .online-waiting-help {display:block}
+    .online-waiting-help {display:none;position:absolute;z-index:40;left:50%;top:42%;transform:translate(-50%,-50%);color:white;text-shadow:0 2px 8px black;font-size:clamp(14px,2vw,23px);font-weight:900;text-align:center;pointer-events:none}
+    body.fortress-online.online-ready .online-waiting-help {display:none}
+    &lt;/style&gt;
 &lt;/head&gt;
 &lt;body class=&quot;min-h-screen flex flex-col justify-between select-none&quot;&gt;
 
@@ -1434,7 +1450,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
 
   &lt;!-- MAIN CANVAS AREA --&gt;
   &lt;main id=&quot;game-container&quot; class=&quot;flex-1 relative&quot;&gt;
-    &lt;canvas id=&quot;gameCanvas&quot;&gt;&lt;/canvas&gt;
+    &lt;canvas id=&quot;gameCanvas&quot;&gt;&lt;/canvas&gt;&lt;div class=&quot;online-waiting-help&quot; id=&quot;fortress-online-waiting&quot;&gt;상대 반 접속을 기다리는 중…&lt;/div&gt;
   &lt;!-- 캔버스 바깥 HUD: 캐릭터를 가리지 않는 발사 기록 --&gt;
   &lt;div id=&quot;shot-panel&quot; aria-live=&quot;polite&quot;&gt;
     &lt;div id=&quot;shot-history&quot;&gt;직전 기록 없음&lt;/div&gt;
@@ -1743,6 +1759,10 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     // ==========================================
     function resizeCanvas() {
       const container = document.getElementById(&#x27;game-container&#x27;);
+      if(onlineRole){
+        canvas.width=960;canvas.height=600;
+        draw();return;
+      }
       canvas.width = container.clientWidth;
       canvas.height = container.clientHeight;
       if(fieldItem){document.getElementById(&#x27;field-item&#x27;).style.left=(canvas.width*.5)+&#x27;px&#x27;;document.getElementById(&#x27;field-item&#x27;).style.top=(canvas.height*.38)+&#x27;px&#x27;;}
@@ -1967,7 +1987,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       el.textContent=`이번  각도 ${angle}° (${da&gt;=0?&#x27;+&#x27;:&#x27;&#x27;}${da}°)  |  힘 ${power}% (${dp&gt;=0?&#x27;+&#x27;:&#x27;&#x27;}${dp}%)`;
     }
     function updateMovementUI() {
-      const disabled=gameFinished || Object.keys(fallingTanks).length&gt;0 || isFiring || isAiming || !!movementState || (isAiMode &amp;&amp; turn===&#x27;P2&#x27;);
+      const disabled=gameFinished || Object.keys(fallingTanks).length&gt;0 || isFiring || isAiming || !!movementState || (isAiMode &amp;&amp; turn===&#x27;P2&#x27;) || (onlineRole &amp;&amp; (!onlineReady || onlineRole!==turn));
       const t=tanks[turn],enemy=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
       for(const dir of [-1,1]) {
         const btn=document.getElementById(dir&lt;0?&#x27;move-left&#x27;:&#x27;move-right&#x27;);
@@ -2274,10 +2294,10 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
           return;
         }
         if (isFiring) {
-          if (selectedWeapon === &#x27;triple&#x27; &amp;&amp; projectiles.length === 1 &amp;&amp; projectiles[0].type === &#x27;triple&#x27;) splitTripleShot();
+          if ((!onlineRole || onlineRole===turn) &amp;&amp; selectedWeapon === &#x27;triple&#x27; &amp;&amp; projectiles.length === 1 &amp;&amp; projectiles[0].type === &#x27;triple&#x27;) splitTripleShot();
           return;
         }
-        if (isAiMode &amp;&amp; turn === &#x27;P2&#x27; || isAiming) return;
+        if ((onlineRole &amp;&amp; (!onlineReady || onlineRole!==turn)) || (isAiMode &amp;&amp; turn === &#x27;P2&#x27;) || isAiming) return;
         const pos = pointerPosition(e), t=tanks[turn];
         if (Math.hypot(pos.x-t.x,pos.y-(t.y-12)) &gt; 85) return;
         e.preventDefault();
@@ -3292,6 +3312,243 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       requestAnimationFrame(gameLoop);
     }
 
+
+    // ===== Classroom-versus-classroom real-time mode =====
+    let onlineRole=null,onlineReady=false,onlineRemoteExecuting=false,onlineApplying=false,onlineCommandPending=false;
+    let onlineFinalPending=null, onlineApplyTimer=null, onlineWinnerName=null;
+    function onlineBridge(){try{return window.parent.fortressOnlineBridge||null}catch(e){return null}}
+    function onlineCanControl(){return !!onlineRole&amp;&amp;onlineReady&amp;&amp;onlineRole===turn&amp;&amp;!gameFinished&amp;&amp;!isFiring&amp;&amp;!movementState&amp;&amp;!onlineCommandPending}
+    function onlinePublish(){
+      if(onlineRole===&#x27;P1&#x27; &amp;&amp; !onlineApplying){const bridge=onlineBridge();if(bridge)bridge.publishSnapshot(fortressExportState());}
+    }
+    function fortressExportState(){
+      return {version:2,canvasW:canvas.width,canvasH:canvas.height,landscapeSeed,
+        terrainPoints:terrainPoints.map(p=&gt;({x:p.x,y:p.y,broken:!!p.broken})),
+        tanks:JSON.parse(JSON.stringify(tanks)),ammo:JSON.parse(JSON.stringify(ammo)),
+        coverRocks:JSON.parse(JSON.stringify(coverRocks)),
+        wind:String(wind),turn,items:JSON.parse(JSON.stringify(items)),
+        boostArmed:{P1:boostArmed.P1,P2:boostArmed.P2},
+        extraTurnPending,extraTurnOwner,gameFinished,winnerName:onlineWinnerName,
+        winnerReason:document.getElementById(&#x27;winner-subtext&#x27;)?.textContent||&#x27;&#x27;,
+        shotHistory:JSON.parse(JSON.stringify(shotHistory)),
+        fieldItem:fieldItem?{...fieldItem,x:Number(document.getElementById(&#x27;field-item&#x27;).style.left.replace(&#x27;px&#x27;,&#x27;&#x27;))||canvas.width*.5,y:Number(document.getElementById(&#x27;field-item&#x27;).style.top.replace(&#x27;px&#x27;,&#x27;&#x27;))||canvas.height*.38}:null,
+        updatedAt:Date.now()};
+    }
+    function fortressApplySnapshot(s){
+      if(!onlineRole||!s||s.version!==2)return;
+      if(s.canvasW!==960||s.canvasH!==600)return;
+      onlineApplying=true;
+      ++animationToken;
+      isFiring=false;isAiming=false;movementState=null;activeShot=null;projectiles=[];
+      debris=[];particles=[];explosions=[];fallingTanks={};
+      canvas.width=960;canvas.height=600;
+      landscapeSeed=s.landscapeSeed;
+      terrainPoints=Array.isArray(s.terrainPoints)?s.terrainPoints.map(p=&gt;({x:p.x,y:p.y,broken:!!p.broken})):[];
+      tanks=JSON.parse(JSON.stringify(s.tanks));
+      ammo=JSON.parse(JSON.stringify(s.ammo));
+      coverRocks=JSON.parse(JSON.stringify(s.coverRocks||[]));
+      items.P1={...s.items.P1};items.P2={...s.items.P2};
+      boostArmed.P1=!!s.boostArmed?.P1;boostArmed.P2=!!s.boostArmed?.P2;
+      extraTurnPending=!!s.extraTurnPending;extraTurnOwner=s.extraTurnOwner||null;
+      wind=s.wind;turn=s.turn;shotHistory.P1=s.shotHistory?.P1||null;shotHistory.P2=s.shotHistory?.P2||null;
+      fieldItem=s.fieldItem||null;
+      const itemEl=document.getElementById(&#x27;field-item&#x27;);
+      if(fieldItem){
+        itemEl.style.display=&#x27;block&#x27;;itemEl.style.left=fieldItem.x+&#x27;px&#x27;;itemEl.style.top=fieldItem.y+&#x27;px&#x27;;
+        document.getElementById(&#x27;field-item-symbol&#x27;).textContent=fieldItem.type===&#x27;double&#x27;?&#x27;⚡&#x27;:&#x27;💥&#x27;;
+        document.getElementById(&#x27;field-item-name&#x27;).textContent=fieldItem.type===&#x27;double&#x27;?&#x27;연속 2턴&#x27;:&#x27;피해 +50&#x27;;
+      }else itemEl.style.display=&#x27;none&#x27;;
+      gameFinished=!!s.gameFinished;onlineWinnerName=s.winnerName||null;
+      for(const key of [&#x27;P1&#x27;,&#x27;P2&#x27;]){
+        document.getElementById(key.toLowerCase()+&#x27;-hp-bar&#x27;).style.width=(tanks[key].hp/tanks[key].maxHp*100)+&#x27;%&#x27;;
+        document.getElementById(key.toLowerCase()+&#x27;-hp-text&#x27;).textContent=tanks[key].hp+&#x27; HP&#x27;;
+        document.getElementById(key.toLowerCase()+&#x27;-name-label&#x27;).textContent=tanks[key].name;
+      }
+      document.getElementById(&#x27;game-class-title&#x27;).textContent=tanks[onlineRole]?.name||&#x27;학급 대전&#x27;;
+      document.getElementById(&#x27;modal-gameover&#x27;).classList.toggle(&#x27;hidden&#x27;,!gameFinished);
+      if(gameFinished){const winner=tanks.P1.hp&lt;=0?tanks.P2:tanks.P2.hp&lt;=0?tanks.P1:null;
+        document.getElementById(&#x27;winner-text&#x27;).textContent=(onlineWinnerName||winner?.name||&#x27;경기&#x27;)+&#x27; 승리!&#x27;;
+        if(s.winnerReason)document.getElementById(&#x27;winner-subtext&#x27;).textContent=s.winnerReason;}
+      onlineReady=true;
+      document.body.classList.add(&#x27;online-ready&#x27;);
+      selectedWeapon=&#x27;normal&#x27;;
+      try{selectWeapon(&#x27;normal&#x27;)}catch(e){}
+      clearTimeout(itemTimer);clearTimeout(aiItemTimer);
+      syncUIWithTurn();updateAmmoUI();updateItemUI();updateMovementUI();draw();
+      onlineCommandPending=false;
+      onlineApplying=false;
+    }
+    function fortressReceiveSnapshot(s){
+      if(!onlineRole||onlineRole===&#x27;P1&#x27;)return;
+      onlineFinalPending=s;
+      clearTimeout(onlineApplyTimer);
+      const finish=()=&gt;{
+        if(!onlineRole||onlineRole===&#x27;P1&#x27;||!onlineFinalPending)return;
+        if(isFiring||movementState||Object.keys(fallingTanks).length){onlineApplyTimer=setTimeout(finish,90);return;}
+        const value=onlineFinalPending;onlineFinalPending=null;fortressApplySnapshot(value);
+      };
+      finish();
+    }
+    function fortressEnterOnline(role,hostClass,guestClass,snapshot){
+      onlineRole=role;onlineReady=false;onlineCommandPending=false;
+      isAiMode=false;document.body.classList.add(&#x27;fortress-online&#x27;,&#x27;fortress-role-&#x27;+role.toLowerCase());
+      document.body.classList.remove(&#x27;fortress-role-&#x27;+(role===&#x27;P1&#x27;?&#x27;p2&#x27;:&#x27;p1&#x27;),&#x27;online-ready&#x27;);
+      document.getElementById(&#x27;mode-label&#x27;).textContent=&#x27;학급간 실시간&#x27;;
+      clearTimeout(itemTimer);clearTimeout(aiItemTimer);
+      canvas.width=960;canvas.height=600;
+      if(role===&#x27;P1&#x27;){
+        tanks.P1.name=hostClass;tanks.P2.name=guestClass||&#x27;상대 반&#x27;;
+        resetGame();
+        onlinePublish();
+      }else if(snapshot){
+        fortressApplySnapshot(snapshot);
+      }
+      updateItemUI();updateMovementUI();draw();
+    }
+    function fortressOnlineOpponentJoined(guestClass){
+      if(onlineRole!==&#x27;P1&#x27;)return;
+      tanks.P2.name=guestClass;
+      document.getElementById(&#x27;p2-name-label&#x27;).textContent=guestClass;
+      onlineReady=true;document.body.classList.add(&#x27;online-ready&#x27;);
+      onlinePublish();syncUIWithTurn();
+    }
+    function fortressLeaveOnline(){
+      onlineRole=null;onlineReady=false;onlineCommandPending=false;
+      document.body.classList.remove(&#x27;fortress-online&#x27;,&#x27;fortress-role-p1&#x27;,&#x27;fortress-role-p2&#x27;,&#x27;online-ready&#x27;);
+      isAiMode=true;tanks.P1.name=&#x27;1학년 3반&#x27;;tanks.P2.name=&#x27;AI 보트&#x27;;
+      document.getElementById(&#x27;mode-label&#x27;).textContent=&#x27;VS AI 모드&#x27;;
+      resizeCanvas();resetGame();
+    }
+    function onlineLocalAction(action){
+      if(!onlineRole)return false;
+      if(onlineRemoteExecuting||onlineApplying)return false;
+      if(!onlineCanControl()){itemNotice(onlineRole===turn?&#x27;상대 반과 동기화 중&#x27;:&#x27;상대 반 차례입니다&#x27;);return true;}
+      const bridge=onlineBridge();
+      if(!bridge){itemNotice(&#x27;실시간 연결이 필요합니다&#x27;);return true;}
+      if(onlineRole===&#x27;P2&#x27;){
+        onlineCommandPending=true;
+        bridge.sendCommand(action).catch(()=&gt;{onlineCommandPending=false;itemNotice(&#x27;요청 전송 실패&#x27;);});
+        return true;
+      }
+      bridge.publishAction(action).catch(()=&gt;itemNotice(&#x27;발사 공유 실패&#x27;));
+      return false;
+    }
+    function fortressReplayAction(action){
+      if(!onlineRole||!action)return false;
+      // On the host, remote actions execute once; on the guest, both sides&#x27; actions are replayed.
+      if(onlineRole===&#x27;P1&#x27; &amp;&amp; action.actor===&#x27;P1&#x27;)return false;
+      if(onlineRole===&#x27;P2&#x27; &amp;&amp; !onlineReady)return false;
+      if(action.actor!==turn &amp;&amp; action.type!==&#x27;claim&#x27;)return false;
+      onlineRemoteExecuting=true;onlineCommandPending=false;
+      try{
+        if(action.type===&#x27;fire&#x27;){
+          selectedWeapon=action.weapon||&#x27;normal&#x27;;selectWeapon(selectedWeapon);
+          return fireCannon(Number(action.angle),Number(action.power));
+        }
+        if(action.type===&#x27;move&#x27;)return moveCharacter(Number(action.dir),true);
+        if(action.type===&#x27;split&#x27;)return splitTripleShot();
+        if(action.type===&#x27;item&#x27;)return useItem(action.item,true);
+        if(action.type===&#x27;claim&#x27;)return claimItem(action.actor,true);
+      }finally{onlineRemoteExecuting=false;}
+      return false;
+    }
+    function fortressRemoteCommand(action){
+      if(onlineRole!==&#x27;P1&#x27;||!onlineReady||!action||action.actor!==&#x27;P2&#x27;)return false;
+      if(action.type!==&#x27;claim&#x27; &amp;&amp; action.type!==&#x27;split&#x27; &amp;&amp; (turn!==&#x27;P2&#x27;||isFiring||movementState||gameFinished))return false;
+      if(action.type===&#x27;fire&#x27; &amp;&amp; (![&#x27;normal&#x27;,&#x27;triple&#x27;,&#x27;rock&#x27;].includes(action.weapon)||
+        !Number.isFinite(action.angle)||!Number.isFinite(action.power)||action.power&lt;0||action.power&gt;22.01||
+        (action.weapon!==&#x27;normal&#x27;&amp;&amp;ammo.P2[action.weapon]&lt;=0)))return false;
+      if(action.type===&#x27;item&#x27; &amp;&amp; (![&#x27;double&#x27;,&#x27;perfect&#x27;].includes(action.item)||!items.P2[action.item]))return false;
+      if(action.type===&#x27;claim&#x27;&amp;&amp;(!fieldItem||gameFinished))return false;
+      if(action.type===&#x27;move&#x27;&amp;&amp; ![-1,1].includes(action.dir))return false;
+      if(action.type===&#x27;split&#x27;&amp;&amp;!(isFiring&amp;&amp;turn===&#x27;P2&#x27;&amp;&amp;projectiles.length===1&amp;&amp;projectiles[0].type===&#x27;triple&#x27;))return false;
+      // Broadcast only accepted commands; P1 is authoritative.
+      const bridge=onlineBridge();if(bridge)bridge.publishAction(action);
+      fortressReplayAction(action);
+      if(action.type===&#x27;item&#x27;||action.type===&#x27;claim&#x27;)setTimeout(onlinePublish,80);
+      return true;
+    }
+    const baseFireCannon=fireCannon;
+    fireCannon=function(angle,power,guided=false){
+      if(onlineRole&amp;&amp;!onlineRemoteExecuting&amp;&amp;onlineLocalAction({actor:onlineRole,type:&#x27;fire&#x27;,angle,power,weapon:selectedWeapon}))return;
+      return baseFireCannon(angle,power,guided);
+    };
+    const baseMoveCharacter=moveCharacter;
+    moveCharacter=function(dir,ai=false){
+      if(onlineRole&amp;&amp;!onlineRemoteExecuting&amp;&amp;onlineLocalAction({actor:onlineRole,type:&#x27;move&#x27;,dir}))return true;
+      return baseMoveCharacter(dir,ai);
+    };
+    const baseUseItem=useItem;
+    useItem=function(item,ai=false){
+      if(onlineRole&amp;&amp;!onlineRemoteExecuting&amp;&amp;onlineLocalAction({actor:onlineRole,type:&#x27;item&#x27;,item}))return;
+      const result=baseUseItem(item,ai);
+      if(onlineRole===&#x27;P1&#x27;&amp;&amp;onlineRemoteExecuting)setTimeout(onlinePublish,80);
+      return result;
+    };
+    const baseSplitTripleShot=splitTripleShot;
+    splitTripleShot=function(){
+      if(onlineRole&amp;&amp;!onlineRemoteExecuting){
+        if(onlineRole!==turn)return;
+        const bridge=onlineBridge();
+        if(onlineRole===&#x27;P2&#x27;){
+          if(bridge)bridge.sendCommand({actor:&#x27;P2&#x27;,type:&#x27;split&#x27;}).catch(()=&gt;itemNotice(&#x27;분열 요청 실패&#x27;));
+          return;
+        }
+        if(bridge)bridge.publishAction({actor:turn,type:&#x27;split&#x27;});
+      }
+      return baseSplitTripleShot();
+    };
+    const baseClaimItem=claimItem;
+    claimItem=function(owner,ai=false){
+      if(onlineRole &amp;&amp; owner!==onlineRole &amp;&amp; !onlineRemoteExecuting)return;
+      if(onlineRole===&#x27;P2&#x27;&amp;&amp;!onlineRemoteExecuting){
+        const bridge=onlineBridge();if(bridge)bridge.sendCommand({actor:&#x27;P2&#x27;,type:&#x27;claim&#x27;});return;
+      }
+      const result=baseClaimItem(owner,ai);
+      if(onlineRole===&#x27;P1&#x27;)onlinePublish();
+      return result;
+    };
+    const baseSpawnFieldItem=spawnFieldItem;
+    spawnFieldItem=function(){
+      if(onlineRole===&#x27;P2&#x27;)return;
+      const result=baseSpawnFieldItem();
+      if(onlineRole===&#x27;P1&#x27;){
+        onlinePublish();
+        const oldId=fieldItem?.id;
+        setTimeout(()=&gt;{if(onlineRole===&#x27;P1&#x27; &amp;&amp; (!fieldItem||fieldItem.id!==oldId))onlinePublish();},7700);
+      }
+      return result;
+    };
+    const baseScheduleFieldItem=scheduleFieldItem;
+    scheduleFieldItem=function(){if(onlineRole===&#x27;P2&#x27;)return;return baseScheduleFieldItem();};
+    const baseUpdateItemUI=updateItemUI;
+    updateItemUI=function(){
+      baseUpdateItemUI();
+      if(onlineRole &amp;&amp; (!onlineReady||onlineRole!==turn)){
+        for(const name of [&#x27;double&#x27;,&#x27;perfect&#x27;])document.getElementById(&#x27;item-&#x27;+name).disabled=true;
+      }
+    };
+    const baseEndTurn=endTurn;
+    endTurn=function(){const oldTurn=turn;const result=baseEndTurn();if(onlineRole===&#x27;P1&#x27;&amp;&amp;!isFiring){setTimeout(onlinePublish,120);}return result;};
+    const baseShowGameOver=showGameOver;
+    showGameOver=function(name){onlineWinnerName=name;const result=baseShowGameOver(name);if(onlineRole===&#x27;P1&#x27;)setTimeout(onlinePublish,100);return result;};
+    const baseResetGame=resetGame;
+    resetGame=function(){
+      if(onlineRole===&#x27;P2&#x27;){itemNotice(&#x27;방장은 새 게임을 시작할 수 있습니다&#x27;);return;}
+      onlineWinnerName=null;
+      const result=baseResetGame();if(onlineRole===&#x27;P1&#x27;)setTimeout(onlinePublish,80);return result;
+    };
+    const baseToggleGameMode=toggleGameMode;
+    toggleGameMode=function(){if(onlineRole)return;return baseToggleGameMode();};
+    // Parent calls these methods only from the same-origin integrated smart notifier.
+    window.fortressExportState=fortressExportState;
+    window.fortressEnterOnline=fortressEnterOnline;
+    window.fortressOnlineOpponentJoined=fortressOnlineOpponentJoined;
+    window.fortressReceiveSnapshot=fortressReceiveSnapshot;
+    window.fortressReplayAction=fortressReplayAction;
+    window.fortressRemoteCommand=fortressRemoteCommand;
+    window.fortressLeaveOnline=fortressLeaveOnline;
+
     window.addEventListener(&#x27;resize&#x27;, resizeCanvas);
     window.addEventListener(&#x27;load&#x27;, () =&gt; {
       resizeCanvas();
@@ -3972,6 +4229,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         praiseStudentAttach();
         setTimeout(memoryAttachScores,0);
         setTimeout(memoryWatchChallenges,0);
+        setTimeout(fortressWatchChallenges,0);
         setTimeout(attachNotifierLayout,0);
         attachClassSchedule();
         initReactionChallengeListener();
@@ -4885,7 +5143,240 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       setTimeout(memoryWatchChallenges,1800);
     });
 
+
+    // ===== Fortnite-style classroom artillery: authenticated Firebase realtime rooms =====
+    // No new Firebase project: reuse the smart notifier's existing authenticated session.
+    let fortressRoomRef=null,fortressRole=null,fortressRoomCode='',fortressGameSeq=0;
+    let fortressRoomListeners=[],fortressLastCommandId='',fortressLastActionSeq=0,fortressGuestClass='';
+    let fortressPendingSnapshot=null,fortressLatestRoom=null;
+    function fortressIframe(){return document.getElementById('fortress-game-frame')?.contentWindow||null;}
+    function fortressStatus(text,isError=false){
+      const el=document.getElementById('fortress-room-status');if(!el)return;
+      el.textContent=text;el.className='text-xs font-bold '+(isError?'text-rose-600':'text-slate-600');
+    }
+    function fortressInterface(online){
+      document.getElementById('fortress-create-btn').classList.toggle('hidden',online);
+      document.getElementById('fortress-leave-btn').classList.toggle('hidden',!online);
+      document.getElementById('fortress-solo-btn').classList.toggle('hidden',online);
+    }
+    function fortressEnsureReady(){
+      if(!firebaseReady||!firebaseAuth.currentUser){fortressStatus('Firebase 로그인 후 다른 반 대전을 시작할 수 있습니다.',true);return false;}
+      return true;
+    }
+    window.fortressOnlineBridge={
+      publishSnapshot:(state)=>fortressRoomRef&&fortressRole==='P1'?fortressRoomRef.child('snapshot').set({...state,actionSeq:fortressGameSeq}):Promise.reject(Error('not host')),
+      publishAction:(action)=>{
+        if(!fortressRoomRef||fortressRole!=='P1')return Promise.reject(Error('not host'));
+        return fortressRoomRef.child('events').push({...action,seq:++fortressGameSeq});
+      },
+      sendCommand:(action)=>{
+        if(!fortressRoomRef||fortressRole!=='P2')return Promise.reject(Error('not guest'));
+        return fortressRoomRef.child('commands').push({...action,actor:'P2',id:clientId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)});
+      }
+    };
+    function fortressObserve(ref,event,cb){ref.on(event,cb);fortressRoomListeners.push([ref,event,cb]);}
+    async function fortressLeaveRoom(quiet=false){
+      const oldRef=fortressRoomRef,oldRole=fortressRole;
+      fortressRoomListeners.forEach(([ref,event,cb])=>ref.off(event,cb));fortressRoomListeners=[];
+      fortressRoomRef=null;fortressRole=null;fortressRoomCode='';fortressLastCommandId='';fortressLastActionSeq=0;fortressPendingSnapshot=null;
+      fortressGuestClass='';fortressLatestRoom=null;
+      fortressInterface(false);
+      try{fortressIframe()?.fortressLeaveOnline?.();}catch(err){console.warn('포트리스 전환',err);}
+      if(oldRef){
+        try{if(oldRole==='P1'){await fortressExpireOwnChallenge(fortressRoomCodeForRef(oldRef));await oldRef.update({status:'closed',hostOnline:false});}
+          else await oldRef.update({guestClass:null,guestId:null,status:'waiting'});
+        }catch(e){if(!quiet)fortressStatus('방 종료 상태를 서버에 기록하지 못했습니다.',true);}
+      }
+      if(!quiet)fortressStatus('혼자 플레이 중 · AI 상대');
+    }
+    function fortressChooseSolo(){if(fortressRoomRef)fortressLeaveRoom();else fortressStatus('혼자 플레이 중 · AI 상대');}
+    function fortressWatchRoom(role,roomRef,code,roomInitial){
+      fortressRoomRef=roomRef;fortressRole=role;fortressRoomCode=code;
+      fortressLastActionSeq=Number(roomInitial.actionSeq||0);
+      fortressGameSeq=fortressLastActionSeq;
+      fortressInterface(true);
+      fortressLatestRoom=roomInitial;
+      fortressFrameLoaded();
+      fortressStatus(role==='P1'?'도전장 발송 · 상대 학급 수락 대기 중':`${roomInitial.hostClass}와 연결 중`);
+      fortressObserve(roomRef,'value',snap=>{
+        const r=snap.val();if(!r)return;
+        fortressLatestRoom=r;
+        if(r.status==='closed'){
+          fortressStatus('방장이 대전방을 종료했습니다. 혼자 플레이로 전환해 주세요.',true);return;
+        }
+        if(role==='P1'&&r.guestClass&&fortressGuestClass!==r.guestClass){
+          fortressGuestClass=r.guestClass;
+          try{fortressIframe()?.fortressOnlineOpponentJoined?.(r.guestClass);}catch(e){}
+        }
+        if(r.status==='playing')fortressStatus(`실시간 대전 · ${r.hostClass} vs ${r.guestClass}`);
+      });
+      if(role==='P1'){
+        fortressObserve(roomRef.child('commands').limitToLast(80),'child_added',snap=>{
+          const command=snap.val();if(!command||command.id===fortressLastCommandId)return;
+          fortressLastCommandId=command.id;
+          try{fortressIframe()?.fortressRemoteCommand?.(command);}catch(e){console.error('대전 입력 처리',e);}
+        });
+      }else{
+        fortressObserve(roomRef.child('events').limitToLast(80),'child_added',snap=>{
+          const action=snap.val();if(!action||Number(action.seq)<=fortressLastActionSeq)return;
+          fortressLastActionSeq=Number(action.seq);
+          try{fortressIframe()?.fortressReplayAction?.(action);}catch(e){console.error('대전 애니메이션',e);}
+          if(fortressPendingSnapshot && Number(fortressPendingSnapshot.actionSeq||0)<=fortressLastActionSeq){
+            const state=fortressPendingSnapshot;fortressPendingSnapshot=null;
+            try{fortressIframe()?.fortressReceiveSnapshot?.(state)}catch(e){console.error(e)}
+          }
+        });
+        fortressObserve(roomRef.child('snapshot'),'value',snap=>{
+          const snapshot=snap.val();if(!snapshot)return;
+          if(Number(snapshot.actionSeq||0)>fortressLastActionSeq){fortressPendingSnapshot=snapshot;return;}
+          try{fortressIframe()?.fortressReceiveSnapshot?.(snapshot)}catch(e){console.error(e)}
+        });
+      }
+    }
+    // 기억력 카드 배틀과 동일한 공용 도전장 / 10초 수락 방식.
+    // 게임 종류별로 데이터 경로를 분리하여 다른 게임과 충돌하지 않는다.
+    const fortressChallengePath='common/fortressChallenge';
+    let fortressChallengeRef=null,fortressChallenge=null,fortressChallengeTimer=null;
+    let fortressAcceptBusy=false,fortressChallengeSuppressedId=null;
+    const fortressServerNow=()=>typeof memoryServerNow==='function'?memoryServerNow():Date.now();
+    function fortressRoomCodeForRef(ref){return ref?.key||'';}
+    function fortressChallengeModal(show){
+      const el=document.getElementById('fortress-challenge-modal');
+      if(el){el.classList.toggle('hidden',!show);el.classList.toggle('flex',!!show);}
+    }
+    function fortressHideIncomingChallenge(){
+      fortressChallengeModal(false);
+      if(fortressChallengeTimer){clearInterval(fortressChallengeTimer);fortressChallengeTimer=null;}
+    }
+    function fortressDismissChallenge(){
+      if(fortressChallenge?.roomId)fortressChallengeSuppressedId=fortressChallenge.roomId;
+      fortressHideIncomingChallenge();
+    }
+    async function fortressExpireOwnChallenge(id){
+      if(!id||!firebaseReady)return;
+      try{
+        await firebaseDb.ref(fortressChallengePath).transaction(c=>{
+          if(!c||c.roomId!==id||c.status!=='open'||c.senderId!==clientId)return;
+          return {...c,status:'expired',expiredAt:fortressServerNow()};
+        },undefined,false);
+      }catch(e){console.warn('포트리스 도전장 종료 실패',e);}
+    }
+    async function fortressCreateRoom(){
+      if(!fortressEnsureReady())return;
+      if(fortressRoomRef){fortressStatus('현재 대전을 종료한 뒤 도전장을 보내 주세요.',true);return;}
+      const button=document.getElementById('fortress-create-btn');
+      if(button?.disabled)return;
+      if(button)button.disabled=true;
+      let ref=null,id='';
+      try{
+        // 공용 도전장 하나만 게시할 수 있는 기존 기억력 게임 방식.
+        // 수락되지 않은 유효한 도전장을 덮어쓰지 않도록 transaction을 사용한다.
+        id=Date.now()+'_'+Math.random().toString(36).slice(2,9);
+        ref=firebaseDb.ref('common/fortressRooms/'+id);
+        const challengeRef=firebaseDb.ref(fortressChallengePath);
+        const expiry=fortressServerNow()+10000;
+        const room={hostId:clientId,hostClass:state.className,guestClass:null,guestId:null,
+          status:'waiting',hostOnline:true,createdAt:firebase.database.ServerValue.TIMESTAMP,actionSeq:0};
+        await ref.set(room);
+        const tx=await challengeRef.transaction(c=>{
+          if(c?.status==='open'&&Number(c.expiresAt)>fortressServerNow())return;
+          return {roomId:id,fromClass:state.className,senderId:clientId,
+            expiresAt:expiry,createdAt:firebase.database.ServerValue.TIMESTAMP,status:'open'};
+        },undefined,false);
+        if(!tx.committed){await ref.remove();fortressStatus('다른 학급의 도전장이 진행 중입니다. 잠시 후 다시 시도하세요.',true);return;}
+        fortressGuestClass='';switchTab('gamecenter');switchGameCenter('fortress');
+        fortressWatchRoom('P1',ref,id,room);
+        fortressStatus('⚔️ 도전장 발송! 10초 동안 상대 학급의 수락을 기다립니다.');
+        setTimeout(async()=>{
+          try{
+            const snap=await ref.once('value');
+            if(snap.val()?.guestClass)return;
+            await fortressExpireOwnChallenge(id);
+            if(fortressRoomCode===id&&fortressRole==='P1'){
+              const current=await ref.once('value');
+              if(current.val()?.status==='waiting')fortressStatus('도전장이 만료되었습니다. 대전방 나가기를 눌러 다시 도전하세요.');
+            }
+          }catch(e){console.warn('포트리스 도전장 만료 실패',e);}
+        },Math.max(0,expiry-fortressServerNow())+160);
+      }catch(e){
+        if(ref&&!fortressRoomRef){try{await ref.remove();}catch(_) {}}
+        fortressStatus('도전장 발송 실패: '+(e.code||e.message),true);
+      }finally{if(button)button.disabled=false;}
+    }
+    function fortressWatchChallenges(){
+      if(fortressChallengeRef||!firebaseReady||!firebaseAuth.currentUser)return;
+      fortressChallengeRef=firebaseDb.ref(fortressChallengePath);
+      fortressChallengeRef.on('value',snap=>{
+        const c=snap.val();fortressChallenge=c;
+        if(!c||c.status!=='open'||c.roomId===fortressChallengeSuppressedId||fortressAcceptBusy||
+           c.senderId===clientId||c.fromClass===state.className||
+           fortressServerNow()>=Number(c.expiresAt)||fortressRoomRef){
+          fortressHideIncomingChallenge();return;
+        }
+        document.getElementById('fortress-challenge-text').textContent=c.fromClass+'에서 포트리스 대결을 신청했습니다.';
+        fortressChallengeModal(true);
+        if(fortressChallengeTimer)clearInterval(fortressChallengeTimer);
+        fortressChallengeTimer=setInterval(()=>{
+          if(!fortressChallenge||fortressChallenge.roomId!==c.roomId||fortressServerNow()>=Number(c.expiresAt)){
+            fortressHideIncomingChallenge();return;
+          }
+          document.getElementById('fortress-challenge-countdown').textContent='남은 시간 '+Math.ceil((c.expiresAt-fortressServerNow())/1000)+'초';
+        },200);
+      },e=>{console.warn('포트리스 도전장 수신 실패',e);fortressStatus('도전장 수신 오류 · Firebase fortressChallenge 규칙 확인',true);});
+    }
+    async function fortressAcceptChallenge(){
+      if(fortressAcceptBusy||fortressRoomRef)return;
+      const c=fortressChallenge;
+      if(!c||c.status!=='open'||fortressServerNow()>=Number(c.expiresAt)){
+        fortressHideIncomingChallenge();showToast('도전장 수락 시간이 지났습니다.',true);return;
+      }
+      if(c.fromClass===state.className)return showToast('같은 학급끼리는 대전할 수 없습니다.',true);
+      fortressAcceptBusy=true;
+      const button=document.getElementById('fortress-challenge-accept');
+      if(button)button.disabled=true;
+      try{
+        if(!fortressEnsureReady())return;
+        const ref=firebaseDb.ref('common/fortressRooms/'+c.roomId);
+        const result=await ref.transaction(r=>{
+          if(!r||r.status!=='waiting'||r.guestClass||r.hostClass===state.className||
+             fortressServerNow()>=Number(c.expiresAt))return;
+          return {...r,guestClass:state.className,guestId:clientId,status:'playing'};
+        },undefined,false);
+        if(!result.committed){showToast('다른 학급이 먼저 수락했거나 도전장이 만료되었습니다.',true);return;}
+        fortressChallengeSuppressedId=c.roomId;
+        fortressHideIncomingChallenge();
+        try{
+          await firebaseDb.ref(fortressChallengePath).transaction(current=>{
+            if(!current||current.roomId!==c.roomId)return;
+            return {...current,status:'accepted',acceptedBy:state.className,acceptedAt:fortressServerNow()};
+          },undefined,false);
+        }catch(e){console.warn('도전장 상태 변경 실패',e);}
+        switchTab('gamecenter');switchGameCenter('fortress');
+        fortressWatchRoom('P2',ref,c.roomId,result.snapshot.val());
+        showToast('포트리스 학급 대전에 연결되었습니다!');
+      }catch(e){console.error('포트리스 도전장 수락 오류',e);showToast('대전 연결 실패: '+(e.code||e.message),true);}
+      finally{fortressAcceptBusy=false;if(button)button.disabled=false;}
+    }
+    window.addEventListener('DOMContentLoaded',()=>{
+      firebaseAuth.onAuthStateChanged(user=>{if(user)setTimeout(fortressWatchChallenges,250);});
+      setTimeout(fortressWatchChallenges,1800);
+    });
+    // Check dropped and reconnected participants; existing notifier Firebase login handles auth.
+
     let activeGameCenterTab = 'clickrace';
+    function fortressFrameLoaded(){
+      const frame=fortressIframe();
+      if(!frame)return;
+      if(activeGameCenterTab==='fortress')resizeFortressFrame();
+      if(!fortressRole||!fortressLatestRoom||typeof frame.fortressEnterOnline!=='function')return;
+      try{
+        const r=fortressLatestRoom;
+        if(fortressRole==='P1'){
+          frame.fortressEnterOnline('P1',r.hostClass,r.guestClass||'',null);
+          if(r.guestClass)frame.fortressOnlineOpponentJoined?.(r.guestClass);
+        }else frame.fortressEnterOnline('P2',r.hostClass,r.guestClass||state.className,r.snapshot||null);
+      }catch(err){console.error('포트리스 온라인 화면 초기화 실패',err);fortressStatus('게임 화면 연결 오류',true);}
+    }
     function resizeFortressFrame() {
       const frame = document.getElementById('fortress-game-frame');
       if (!frame) return;
@@ -4893,6 +5384,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     }
     function reloadFortressGame() {
       const frame = document.getElementById('fortress-game-frame');
+      if (fortressRoomRef) {fortressStatus('대전 중에는 새로고침 대신 대전방 나가기를 사용해 주세요.',true);return;}
       if (frame) frame.contentWindow?.location.reload();
     }
     function switchGameCenter(game) {
@@ -7666,5 +8158,17 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     updateMobileHeader();
   })();
 </script>
+  <!-- FORTRESS: memory-card style classroom challenge invitation -->
+  <div id="fortress-challenge-modal" class="fixed inset-0 z-[65] hidden items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="fortress-challenge-heading">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+      <h3 id="fortress-challenge-heading" class="font-black text-xl text-emerald-800">🏔️ 앵그리 포트리스 도전장!</h3>
+      <p id="fortress-challenge-text" class="font-bold text-slate-700"></p>
+      <p id="fortress-challenge-countdown" class="text-rose-600 font-extrabold" aria-live="polite"></p>
+      <div class="flex gap-2">
+        <button id="fortress-challenge-accept" onclick="fortressAcceptChallenge()" class="flex-1 bg-emerald-600 text-white font-extrabold py-3 rounded-xl disabled:opacity-50">수락</button>
+        <button onclick="fortressDismissChallenge()" class="flex-1 bg-slate-200 text-slate-700 font-extrabold py-3 rounded-xl">닫기</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
