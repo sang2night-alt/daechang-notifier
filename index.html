@@ -1138,12 +1138,12 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
   &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no&quot;&gt;
   &lt;title&gt;대창중 학급 대항전 - 앵그리 포트리스 버드&lt;/title&gt;
   &lt;!-- Tailwind CSS CDN --&gt;
-  &lt;script src=&quot;https://cdn.tailwindcss.com&quot;&gt;&lt;/script&gt;
+  &lt;script async src=&quot;https://cdn.tailwindcss.com&quot;&gt;&lt;/script&gt;
   &lt;!-- FontAwesome Icons --&gt;
   &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css&quot;&gt;
 
   &lt;style&gt;
-    @import url(&#x27;https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css&#x27;);
+    /* Pretendard optional: system font fallback for instant game input */
 
     * {
       font-family: &#x27;Pretendard&#x27;, -apple-system, sans-serif;
@@ -1763,8 +1763,8 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         canvas.width=960;canvas.height=600;
         draw();return;
       }
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
+      canvas.width = Math.max(320, container.clientWidth || window.innerWidth || 960);
+      canvas.height = Math.max(360, container.clientHeight || Math.min(window.innerHeight || 600, 700));
       if(fieldItem){document.getElementById(&#x27;field-item&#x27;).style.left=(canvas.width*.5)+&#x27;px&#x27;;document.getElementById(&#x27;field-item&#x27;).style.top=(canvas.height*.38)+&#x27;px&#x27;;}
       generateTerrain();
       initBgParticles();
@@ -3379,17 +3379,25 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       onlineApplying=false;
     }
     function fortressReceiveSnapshot(s){
-      if(!onlineRole||onlineRole===&#x27;P1&#x27;)return;
+      if(!onlineRole||onlineRole===&#x27;P1&#x27;||!s)return;
       onlineFinalPending=s;
       clearTimeout(onlineApplyTimer);
+      const deadline=performance.now()+1800;
       const finish=()=&gt;{
         if(!onlineRole||onlineRole===&#x27;P1&#x27;||!onlineFinalPending)return;
-        if(isFiring||movementState||Object.keys(fallingTanks).length){onlineApplyTimer=setTimeout(finish,90);return;}
-        const value=onlineFinalPending;onlineFinalPending=null;fortressApplySnapshot(value);
+        if((isFiring||movementState||Object.keys(fallingTanks).length) &amp;&amp; performance.now()&lt;deadline){
+          onlineApplyTimer=setTimeout(finish,90);return;
+        }
+        const value=onlineFinalPending;onlineFinalPending=null;
+        fortressApplySnapshot(value);
       };
       finish();
     }
     function fortressEnterOnline(role,hostClass,guestClass,snapshot){
+      if(onlineRole===role){
+        if(role===&#x27;P2&#x27;&amp;&amp;snapshot&amp;&amp;!onlineReady)fortressApplySnapshot(snapshot);
+        return;
+      }
       onlineRole=role;onlineReady=false;onlineCommandPending=false;
       isAiMode=false;document.body.classList.add(&#x27;fortress-online&#x27;,&#x27;fortress-role-&#x27;+role.toLowerCase());
       document.body.classList.remove(&#x27;fortress-role-&#x27;+(role===&#x27;P1&#x27;?&#x27;p2&#x27;:&#x27;p1&#x27;),&#x27;online-ready&#x27;);
@@ -3402,6 +3410,8 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         onlinePublish();
       }else if(snapshot){
         fortressApplySnapshot(snapshot);
+      } else {
+        itemNotice(&#x27;상대 반의 경기 상태를 불러오는 중…&#x27;);
       }
       updateItemUI();updateMovementUI();draw();
     }
@@ -3549,14 +3559,23 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     window.fortressRemoteCommand=fortressRemoteCommand;
     window.fortressLeaveOnline=fortressLeaveOnline;
 
-    window.addEventListener(&#x27;resize&#x27;, resizeCanvas);
-    window.addEventListener(&#x27;load&#x27;, () =&gt; {
+    // DOM이 준비되면 즉시 게임 시작. CDN 이미지/스타일 로딩을 기다리지 않음.
+    let fortressInitialized=false;
+    function fortressBoot(){
+      if(fortressInitialized)return;
+      fortressInitialized=true;
       resizeCanvas();
       setupTouchEvents();
       syncUIWithTurn();
       scheduleFieldItem();
       gameLoop();
-    });
+      try{window.parent?.fortressFrameLoaded?.()}catch(e){}
+    }
+    window.addEventListener(&#x27;resize&#x27;,()=&gt;{if(fortressInitialized)resizeCanvas()});
+    if(document.readyState===&#x27;loading&#x27;)document.addEventListener(&#x27;DOMContentLoaded&#x27;,fortressBoot,{once:true});
+    else fortressBoot();
+    // iframe 안에 로딩 대기가 있어도 입력이 늦게 잠기지 않도록 보험.
+    window.addEventListener(&#x27;load&#x27;,fortressBoot,{once:true});
   &lt;/script&gt;
 &lt;/body&gt;
 &lt;/html&gt;"></iframe>
@@ -5228,7 +5247,17 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         });
         fortressObserve(roomRef.child('snapshot'),'value',snap=>{
           const snapshot=snap.val();if(!snapshot)return;
-          if(Number(snapshot.actionSeq||0)>fortressLastActionSeq){fortressPendingSnapshot=snapshot;return;}
+          if(Number(snapshot.actionSeq||0)>fortressLastActionSeq){
+            fortressPendingSnapshot=snapshot;
+            // 빠진/지연된 이벤트가 있어도 서버의 최종 상태를 동기화해 입력 잠금을 방지.
+            setTimeout(()=>{
+              if(fortressRole!=='P2'||fortressPendingSnapshot!==snapshot)return;
+              fortressPendingSnapshot=null;
+              fortressLastActionSeq=Math.max(fortressLastActionSeq,Number(snapshot.actionSeq||0));
+              try{fortressIframe()?.fortressReceiveSnapshot?.(snapshot)}catch(e){console.error(e)}
+            },1800);
+            return;
+          }
           try{fortressIframe()?.fortressReceiveSnapshot?.(snapshot)}catch(e){console.error(e)}
         });
       }
@@ -7196,6 +7225,13 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       updateClassroomInactivityCountdown();
       classroomInactivityCountdownTimer = setInterval(updateClassroomInactivityCountdown, 1000);
       classroomInactivityTimer = setTimeout(() => {
+        // iframe 내부의 포격/드래그는 부모 문서의 입력 감시기로 전달되지 않는다.
+        // 포트리스 탭을 이용 중일 때는 시계 자동 전환으로 경기를 중단하지 않는다.
+        if (typeof activeGameCenterTab !== 'undefined' && activeGameCenterTab === 'fortress' &&
+            !document.getElementById('view-gamecenter')?.classList.contains('hidden')) {
+          resetClassroomInactivityTimer();
+          return;
+        }
         if (classroomInactivityCountdownTimer) {
           clearInterval(classroomInactivityCountdownTimer);
           classroomInactivityCountdownTimer = null;
