@@ -902,6 +902,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         <button id="game-sub-btn-clickrace" onclick="switchGameCenter('clickrace')" class="flex-1 min-w-[150px] bg-amber-500 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-bolt mr-2"></i>광클 레이스</button>
         <button id="game-sub-btn-memory" onclick="switchGameCenter('memory')" class="flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-brain mr-2"></i>기억력 카드 배틀</button>
         <button id="game-sub-btn-reaction" onclick="switchGameCenter('reaction')" class="flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-stopwatch mr-2"></i>반응속도 배틀</button>
+        <button id="game-sub-btn-fortress" onclick="switchGameCenter('fortress')" class="flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition"><i class="fa-solid fa-mountain mr-2"></i>앵그리 포트리스</button>
       </div>
       <section id="game-view-clickrace" class="space-y-6">
       <div class="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white rounded-3xl p-6 shadow-md flex flex-wrap justify-between items-center gap-4">
@@ -1116,6 +1117,2192 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
           <p id="memory-status" role="status" aria-live="polite" class="text-sm font-bold text-slate-600">카드를 누르면 타이머가 시작됩니다.</p>
           <div id="memory-board" class="grid grid-cols-4 memory-uniform-board" aria-label="기억력 카드 게임판"></div>
         </div>
+      </section>
+      <!-- 앵그리 포트리스: isolate its canvas / audio / keyboard handlers from the smart notifier. -->
+      <section id="game-view-fortress" class="hidden" aria-label="앵그리 포트리스 게임">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
+          <div class="text-sm font-black text-slate-800"><i class="fa-solid fa-mountain text-emerald-600 mr-2"></i>앵그리 포트리스 <span class="text-xs text-slate-500 font-bold ml-1">AI 대전 · 2인 대전</span></div>
+          <button type="button" onclick="reloadFortressGame()" class="text-xs font-extrabold text-slate-600 border border-slate-200 bg-white px-3 py-2 rounded-lg hover:bg-slate-50"><i class="fa-solid fa-rotate-right mr-1"></i>게임 새로고침</button>
+        </div>
+        <iframe id="fortress-game-frame" onload="if(activeGameCenterTab==='fortress')resizeFortressFrame()" title="앵그리 포트리스" loading="lazy" allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-modals" referrerpolicy="no-referrer" style="display:block;width:100%;height:clamp(560px,77dvh,900px);border:0;border-radius:14px;background:#b9e9ff;overflow:hidden;" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;ko&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no&quot;&gt;
+  &lt;title&gt;대창중 학급 대항전 - 앵그리 포트리스 버드&lt;/title&gt;
+  &lt;!-- Tailwind CSS CDN --&gt;
+  &lt;script src=&quot;https://cdn.tailwindcss.com&quot;&gt;&lt;/script&gt;
+  &lt;!-- FontAwesome Icons --&gt;
+  &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css&quot;&gt;
+
+  &lt;style&gt;
+    @import url(&#x27;https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css&#x27;);
+
+    * {
+      font-family: &#x27;Pretendard&#x27;, -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    body {
+      background-color: #bae6fd;
+      overflow: hidden;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(12px);
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 8px 24px rgba(14, 165, 233, 0.15);
+    }
+
+    .btn-pop {
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-pop:active {
+      transform: scale(0.92);
+    }
+
+    .weapon-btn {
+      border: 3px solid #cbd5e1;
+      background: #f8fafc;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .weapon-btn.active {
+      border-color: #0284c7;
+      background: #e0f2fe;
+      box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);
+      transform: translateY(-2px);
+    }
+    .weapon-btn.disabled {
+      opacity: 0.5;
+      filter: grayscale(0.6);
+      cursor: not-allowed;
+    }
+
+    #shot-panel {display:flex;align-items:center;justify-content:center;gap:18px;min-height:54px;flex-wrap:wrap;background:rgba(15,23,42,.92);color:white;padding:9px 16px;position:relative;z-index:22;box-shadow:0 3px 12px #0f172a24}
+    #shot-history {font-weight:800;font-size:clamp(14px,1.8vw,20px);white-space:nowrap}
+    #trajectory-toggle {border:1px solid #94a3b8;border-radius:999px;padding:6px 12px;background:#334155;color:#e2e8f0;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
+    #trajectory-toggle[aria-pressed=&quot;true&quot;] {background:#e0f2fe;color:#075985;border-color:#38bdf8}
+    #shot-live {font-weight:900;color:#7dd3fc;font-size:clamp(14px,1.8vw,20px);white-space:nowrap}
+    #battle-controls {position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:25;width:min(92%,790px);display:flex;gap:12px;align-items:stretch;justify-content:center;pointer-events:auto}
+    #move-panel {display:flex;align-items:stretch;gap:6px}
+    #weapon-panel {display:flex;gap:7px;align-items:stretch;flex:1;max-width:485px}
+    #weapon-panel .weapon-btn {min-width:0;flex:1;padding:5px 7px}
+    #move-panel button {min-width:74px}
+    #move-panel button:disabled {cursor:not-allowed}
+    @media(max-width:620px) {
+      #shot-panel {gap:1px;flex-direction:column;min-height:54px;padding:5px 4px}
+      #shot-history,#shot-live {font-size:13px}
+      #battle-controls {width:98%;gap:5px;bottom:5px}
+      #move-panel {gap:3px}
+      #move-panel button {min-width:46px;padding:6px 4px;font-size:11px}
+      #weapon-panel {gap:3px;padding:4px}
+      #weapon-panel .weapon-btn {padding:4px 2px}
+      #weapon-panel .weapon-btn span {font-size:10px}
+    }
+    /* Minimal, fully transparent in-game controls: scenery remains visible. */
+    #battle-controls {
+      bottom: 8px;
+      width: min(86%, 580px);
+      gap: 7px;
+      align-items: center;
+      filter: none;
+    }
+    #battle-controls #move-panel,
+    #battle-controls #weapon-panel,
+    #battle-controls #weapon-panel &gt; div {
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      gap: 3px;
+    }
+    #battle-controls #move-panel {flex: 0 0 auto;}
+    #battle-controls #weapon-panel {flex: 1; max-width: 370px; padding: 0 !important;}
+    #battle-controls #move-panel button,
+    #battle-controls #weapon-panel .weapon-btn {
+      background: transparent !important;
+      border: 0 !important;
+      border-radius: 9px;
+      box-shadow: none !important;
+      min-width: 0;
+      min-height: 44px;
+      padding: 3px 5px !important;
+      transform: none;
+      position: relative;
+      color: #fff;
+      text-shadow: 0 1px 3px #102031, 0 0 5px #102031, 0 0 2px #102031;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity .15s, filter .15s;
+    }
+    #battle-controls #move-panel button {font-size: 12px; font-weight: 900; min-width: 58px;}
+    #battle-controls #weapon-panel .weapon-btn {gap: 0;}
+    #battle-controls #weapon-panel .weapon-btn span {
+      color: #fff !important;
+      margin-top: 0 !important;
+      text-shadow: 0 1px 3px #12263d, 0 0 5px #12263d, 0 0 2px #12263d;
+      line-height: 1.15;
+    }
+    #battle-controls #weapon-panel .weapon-btn span:first-child {font-size: 18px !important; line-height: 1.1; filter: drop-shadow(0 1px 2px #102031);}
+    #battle-controls #weapon-panel .weapon-btn span:nth-child(2) {font-size: 11px !important;}
+    #battle-controls #weapon-panel .weapon-btn span:nth-child(3) {font-size: 9px !important; color: #e2f7ff !important;}
+    #battle-controls #weapon-panel .weapon-btn.active::after {
+      content: &quot;&quot;;
+      position: absolute;
+      bottom: 0;
+      left: 26%; right: 26%;
+      height: 3px;
+      border-radius: 3px;
+      background: #fef08a;
+      box-shadow: 0 0 6px 2px #facc15;
+    }
+    #battle-controls #weapon-panel .weapon-btn.active span:first-child {filter: drop-shadow(0 0 5px #fef08a);}
+    #battle-controls #weapon-panel .weapon-btn.disabled {opacity: .4; filter: grayscale(1);}
+    #battle-controls #move-panel button:disabled {opacity: .35;}
+    #battle-controls button:focus-visible {outline: 2px solid #fef08a; outline-offset: 1px;}
+    @media (max-width:620px) {
+      #battle-controls {bottom: 4px; width: 99%; gap: 1px;}
+      #battle-controls #move-panel button {font-size: 10px; min-width: 43px; padding: 2px !important;}
+      #battle-controls #weapon-panel {padding: 0 !important;}
+      #battle-controls #weapon-panel .weapon-btn {padding: 2px 1px !important; min-height: 44px;}
+      #battle-controls #weapon-panel .weapon-btn span:first-child {font-size: 16px !important;}
+      #battle-controls #weapon-panel .weapon-btn span:nth-child(2) {font-size: 10px !important;}
+      #battle-controls #weapon-panel .weapon-btn span:nth-child(3) {font-size: 8px !important;}
+    }
+    /* 아이템은 게임 화면 위에 떠 있지만 기존 투명 조작부를 가리지 않는다. */
+    #field-item {position:absolute;z-index:28;display:none;transform:translate(-50%,-50%);text-align:center;filter:drop-shadow(0 4px 9px #0f172a88);animation:itemFloat 1.4s ease-in-out infinite alternate;pointer-events:auto}
+    #field-item .item-symbol {display:block;font-size:42px;line-height:1.1;filter:drop-shadow(0 0 9px #fef08a)}
+    #field-item .item-name {display:block;font-size:12px;font-weight:900;color:#fff;text-shadow:0 2px 5px #0f172a,0 0 4px #0f172a;white-space:nowrap}
+    #field-item .claim-row {display:flex;justify-content:center;gap:5px;margin-top:3px}
+    #field-item button {border:2px solid white;border-radius:11px;padding:6px 12px;background:#075985e8;color:white;font-size:13px;font-weight:900;box-shadow:0 2px 8px #0008;cursor:pointer}
+    #field-item button.p2 {background:#be123ce8}
+    @keyframes itemFloat {from {translate:0 0} to {translate:0 -9px}}
+    #inventory-panel {display:flex;gap:5px;align-items:center;justify-content:center;flex-wrap:wrap}
+    #inventory-panel button {border:1px solid #fde68a;border-radius:12px;background:#334155;color:#fff;padding:6px 10px;font-size:12px;font-weight:900;cursor:pointer}
+    #inventory-panel button:disabled {opacity:.4;cursor:default}
+    #aim-warning {color:#fef08a;font-weight:900;font-size:13px;min-width:0;text-align:center;display:none}
+    #aim-warning.show {display:inline}
+    #item-toast {position:absolute;top:23%;left:50%;transform:translateX(-50%);z-index:29;pointer-events:none;font-size:17px;font-weight:900;color:white;text-shadow:0 2px 6px #020617;opacity:0;transition:opacity .2s;white-space:nowrap}
+    @media(max-width:650px){#field-item .item-symbol{font-size:35px} #field-item button{padding:5px 8px} #inventory-panel button{font-size:11px;padding:5px 7px}}
+
+    /* 상단 정보는 한 줄로 절제하고, 완벽 가이드 사용 시 시야 확보 */
+    header {padding-top:5px !important;padding-bottom:5px !important;min-height:44px}
+    #shot-panel {gap:9px;padding:5px 9px;min-height:38px;box-shadow:none}
+    #shot-history,#shot-live {font-size:clamp(12px,1.3vw,15px)}
+    #inventory-panel button {padding:5px 8px}
+    #health-hud {transition:opacity .2s ease}
+    body.perfect-mode #health-hud {opacity:.20}
+    body.perfect-mode #turn-banner {opacity:0 !important}
+    body.perfect-mode #shot-panel {background:#0f172a;min-height:40px;gap:5px;flex-direction:row;justify-content:center}
+    body.perfect-mode #shot-history,body.perfect-mode #shot-live,body.perfect-mode #aim-warning,body.perfect-mode #trajectory-toggle {display:none !important}
+    body.perfect-mode #inventory-panel #item-double,body.perfect-mode #inventory-panel #item-perfect {display:none}
+    body.perfect-mode #perfect-fire {display:inline-block !important;background:#facc15;color:#422006;border-color:#fff;font-size:15px;padding:7px 20px;box-shadow:0 0 12px #facc1566}
+    #perfect-fire[hidden]{display:none !important}
+    @media(max-width:650px){#shot-panel{gap:2px;padding:3px 4px}#shot-history,#shot-live{font-size:11px}#inventory-panel button{font-size:10px;padding:4px 6px}}
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    canvas {
+      touch-action: none;
+      cursor: crosshair;
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 2026 HUD: no opaque card or info panel, unobstructed scenery. */
+    #health-hud {top:9px !important;left:clamp(9px,1.7vw,25px) !important;right:clamp(9px,1.7vw,25px) !important;max-width:none !important;z-index:12 !important;align-items:flex-start;pointer-events:none}
+    #health-hud&gt;.glass-card {background:transparent !important;border:0 !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;box-shadow:none !important;padding:2px 3px !important;width:clamp(109px,19vw,208px) !important;border-radius:0 !important}
+    #health-hud .text-xs {font-size:clamp(11px,1.1vw,14px) !important;margin-bottom:3px !important;gap:4px; text-shadow:0 1px 2px #fff,0 2px 4px #0009}
+    #health-hud #p1-hp-text,#health-hud #p2-hp-text {color:#fff !important;text-shadow:0 1px 3px #08192e,0 0 5px #08192e;font-weight:1000}
+    #health-hud #p1-name-label,#health-hud #p2-name-label {color:#fff;text-shadow:0 1px 4px #05243a,0 0 6px #05243a}
+    #health-hud .bg-slate-200 {background:transparent !important;border:1px solid #fff9 !important;padding:1px !important;height:8px !important;box-shadow:0 1px 4px #092b3d}
+    #shot-panel {position:absolute !important;top:48px;left:50%;transform:translateX(-50%);z-index:15;width:max-content;max-width:70%;min-height:0 !important;display:flex;flex-direction:column;gap:3px !important;align-items:center;padding:0 !important;margin:0 !important;color:#fff;background:transparent !important;border:0 !important;box-shadow:none !important;pointer-events:none}
+    #shot-panel #shot-history,#shot-panel #shot-live {font-size:clamp(12px,1.25vw,16px) !important;font-weight:900;line-height:1.25;text-align:center;white-space:nowrap;text-shadow:0 1px 3px #031b28,0 0 7px #031b28}
+    #shot-panel #shot-live {color:#fff4ac}
+    #shot-panel #aim-warning {font-size:12px;text-shadow:0 1px 3px #031b28}
+    #shot-panel #inventory-panel {pointer-events:auto;gap:12px !important;justify-content:center;flex-wrap:nowrap}
+    #shot-panel #inventory-panel button {padding:3px 5px !important;border:0 !important;border-bottom:2px solid #fff8 !important;border-radius:0 !important;background:transparent !important;color:#fff !important;text-shadow:0 1px 3px #08202f,0 0 6px #08202f;box-shadow:none !important;font-size:clamp(12px,1.25vw,16px) !important;font-weight:900}
+    #shot-panel #inventory-panel button:disabled {opacity:.43}
+    #shot-panel #trajectory-toggle {pointer-events:auto;padding:0 4px !important;border:0 !important;background:transparent !important;color:#fff !important;font-size:11px !important;text-shadow:0 1px 4px #08202f}
+    #shot-panel #trajectory-toggle[aria-pressed=&quot;true&quot;] {color:#fef08a !important}
+    #intercept-help {position:absolute;top:32%;left:50%;transform:translateX(-50%);color:#fff;z-index:26;text-align:center;font-size:clamp(15px,2vw,23px);font-weight:1000;pointer-events:none;text-shadow:0 2px 4px #081828,0 0 10px #081828;display:none;white-space:nowrap}
+    body.intercept-choosing #intercept-help {display:block}
+    body.intercept-choosing #gameCanvas {cursor:crosshair}
+    #item-perfect.boost-armed {color:#fef08a !important;border-bottom-color:#facc15 !important;text-shadow:0 0 10px #f59e0b,0 1px 3px #08202f !important;}
+    #item-toast {top:27%;max-width:92%;white-space:normal;text-align:center}
+    @media(max-width:680px){
+      #health-hud {top:3px !important;left:5px !important;right:5px !important}
+      #health-hud&gt;.glass-card {width:107px !important;padding:0 !important}
+      #health-hud .text-xs {font-size:10px !important}
+      #shot-panel {top:38px !important;max-width:98%;gap:2px !important}
+      #shot-panel #shot-history,#shot-panel #shot-live {font-size:11px !important}
+      #shot-panel #inventory-panel button {font-size:11px !important;padding:2px 4px !important}
+      #shot-panel #trajectory-toggle {font-size:10px !important}
+    }
+
+
+    /* 완전 투명 상단 HUD: 하늘색 바탕 자체가 이어지도록 유리 카드 삭제 */
+    body { background:linear-gradient(180deg,#7dd3fc 0%,#bae6fd 60%,#e0f2fe 100%); }
+    body &gt; header {background:transparent !important;box-shadow:none !important;border:0 !important;
+      backdrop-filter:none !important;-webkit-backdrop-filter:none !important;
+      padding:4px 10px !important;max-width:none !important;min-height:40px !important;gap:12px;}
+    body &gt; header .glass-card, body &gt; header button {
+      background:transparent !important;box-shadow:none !important;border:0 !important;
+      backdrop-filter:none !important;-webkit-backdrop-filter:none !important;
+      border-radius:0 !important;
+    }
+    body &gt; header &gt; div:first-child, body &gt; header &gt; div:nth-child(2), body &gt; header &gt; div:last-child {min-width:0;gap:6px !important;}
+    body &gt; header &gt; div:first-child {padding:0 !important;flex:0 1 auto;}
+    body &gt; header &gt; div:first-child &gt; div:first-child {background:transparent !important;color:#075985 !important;box-shadow:none !important;width:19px;height:24px;font-size:14px;}
+    body &gt; header &gt; div:first-child .text-\[10px\] {font-size:9px !important;letter-spacing:0 !important;}
+    body &gt; header &gt; div:nth-child(2) {padding:0 !important;gap:7px !important;}
+    body &gt; header &gt; div:nth-child(2) .h-6 {height:17px !important;background:rgba(3,105,161,.35) !important;width:1px !important;}
+    body &gt; header &gt; div:nth-child(2) #wind-icon {font-size:14px !important;}
+    body &gt; header &gt; div:last-child button {padding:2px 5px !important;height:30px !important;min-width:23px !important;}
+    body &gt; header #wind-text,body &gt; header #turn-display,body &gt; header #mode-label,body &gt; header #music-label,
+    body &gt; header #game-class-title,body &gt; header .fa-solid {
+      text-shadow:0 1px 2px #ffffffc7,0 1px 3px #17324c70;
+    }
+    body &gt; header button:focus-visible {outline:2px solid #075985;outline-offset:2px;border-radius:4px !important;}
+    @media(max-width:680px){
+      body &gt; header {padding:3px 5px !important;gap:3px !important;}
+      body &gt; header &gt; div:first-child .text-\[10px\] {display:none}
+      body &gt; header #mode-label {font-size:0 !important;}
+      body &gt; header #mode-label::after {content:&#x27;모드&#x27;;font-size:10px;}
+      body &gt; header #music-label {font-size:0 !important;}
+      body &gt; header #music-label::after {content:&#x27;BGM&#x27;;font-size:10px;}
+      body &gt; header #wind-text,body &gt; header #turn-display {font-size:10px !important;}
+      body &gt; header &gt; div:last-child {gap:0 !important;}
+    }
+
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body class=&quot;min-h-screen flex flex-col justify-between select-none&quot;&gt;
+
+  &lt;!-- HEADER HUD --&gt;
+  &lt;header class=&quot;px-4 py-3 z-20 flex justify-between items-center max-w-6xl mx-auto w-full&quot;&gt;
+    &lt;!-- 좌측 학급 이름 --&gt;
+    &lt;div class=&quot;glass-card px-4 py-2 rounded-2xl flex items-center space-x-2&quot;&gt;
+      &lt;div class=&quot;w-8 h-8 rounded-xl bg-sky-500 text-white flex items-center justify-center font-black text-base shadow-sm&quot;&gt;
+        &lt;i class=&quot;fa-solid fa-graduation-cap&quot;&gt;&lt;/i&gt;
+      &lt;/div&gt;
+      &lt;div&gt;
+        &lt;div class=&quot;text-[10px] font-bold text-sky-600 tracking-wider&quot;&gt;대창중 학급대항전&lt;/div&gt;
+        &lt;div class=&quot;text-xs sm:text-sm font-black text-slate-800&quot; id=&quot;game-class-title&quot;&gt;1학년 3반&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;!-- 중앙 바람 상태판 --&gt;
+    &lt;div class=&quot;glass-card px-5 py-2 rounded-2xl flex items-center space-x-4&quot;&gt;
+      &lt;div class=&quot;flex items-center space-x-2&quot;&gt;
+        &lt;i class=&quot;fa-solid fa-wind text-sky-500 text-xl&quot; id=&quot;wind-icon&quot;&gt;&lt;/i&gt;
+        &lt;div&gt;
+          &lt;div class=&quot;text-[10px] font-extrabold text-slate-400&quot;&gt;WIND SPEED&lt;/div&gt;
+          &lt;div class=&quot;text-xs sm:text-sm font-black text-sky-700&quot; id=&quot;wind-text&quot;&gt;동풍 0m/s&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;h-6 w-[2px] bg-sky-200&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;text-center&quot;&gt;
+        &lt;div class=&quot;text-[10px] font-extrabold text-slate-400&quot;&gt;TURN&lt;/div&gt;
+        &lt;div class=&quot;text-xs sm:text-sm font-black text-amber-500&quot; id=&quot;turn-display&quot;&gt;P1 준비&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;!-- 우측 대전 모드 및 리셋 --&gt;
+    &lt;div class=&quot;flex items-center space-x-2&quot;&gt;
+      &lt;button onclick=&quot;toggleGameMode()&quot; id=&quot;btn-mode-toggle&quot; class=&quot;glass-card px-3.5 py-2 rounded-2xl font-bold text-xs text-sky-700 btn-pop flex items-center space-x-1.5&quot;&gt;
+        &lt;i class=&quot;fa-solid fa-robot&quot;&gt;&lt;/i&gt;
+        &lt;span id=&quot;mode-label&quot;&gt;VS AI 모드&lt;/span&gt;
+      &lt;/button&gt;
+      &lt;button onclick=&quot;toggleMusic()&quot; id=&quot;btn-music&quot; class=&quot;glass-card px-3 h-9 rounded-2xl font-bold text-xs text-sky-700 btn-pop flex items-center gap-1.5&quot; title=&quot;배경음악 켜기/끄기&quot; aria-label=&quot;배경음악 켜기/끄기&quot; aria-pressed=&quot;true&quot;&gt;
+        &lt;i id=&quot;music-icon&quot; class=&quot;fa-solid fa-music&quot;&gt;&lt;/i&gt;&lt;span id=&quot;music-label&quot;&gt;BGM ON&lt;/span&gt;
+      &lt;/button&gt;
+      &lt;button onclick=&quot;resetGame()&quot; class=&quot;glass-card w-9 h-9 rounded-2xl font-bold text-xs text-slate-600 btn-pop flex items-center justify-center&quot;&gt;
+        &lt;i class=&quot;fa-solid fa-rotate-right&quot;&gt;&lt;/i&gt;
+      &lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/header&gt;
+
+  &lt;!-- MAIN CANVAS AREA --&gt;
+  &lt;main id=&quot;game-container&quot; class=&quot;flex-1 relative&quot;&gt;
+    &lt;canvas id=&quot;gameCanvas&quot;&gt;&lt;/canvas&gt;
+  &lt;!-- 캔버스 바깥 HUD: 캐릭터를 가리지 않는 발사 기록 --&gt;
+  &lt;div id=&quot;shot-panel&quot; aria-live=&quot;polite&quot;&gt;
+    &lt;div id=&quot;shot-history&quot;&gt;직전 기록 없음&lt;/div&gt;
+    &lt;div id=&quot;shot-live&quot;&gt;이번: 캐릭터를 당겨 조준&lt;/div&gt;
+    &lt;div id=&quot;aim-warning&quot; role=&quot;status&quot;&gt;⚠ 너무 강한 발사! 화면 밖으로 나갈 수 있어요&lt;/div&gt;
+    &lt;div id=&quot;inventory-panel&quot;&gt;&lt;button id=&quot;item-double&quot; onclick=&quot;useItem(&#x27;double&#x27;)&quot; disabled&gt;⚡ 연속 턴 0&lt;/button&gt;&lt;button id=&quot;item-perfect&quot; onclick=&quot;useItem(&#x27;perfect&#x27;)&quot; disabled&gt;💥 피해 +50 0&lt;/button&gt;&lt;/div&gt;
+    &lt;button id=&quot;trajectory-toggle&quot; type=&quot;button&quot; aria-pressed=&quot;true&quot; onclick=&quot;togglePreviousTrajectory()&quot; title=&quot;지난 발사의 실제 궤적 표시 켜기/끄기&quot;&gt;↗ 이전 탄도 ON&lt;/button&gt;
+  &lt;/div&gt;
+
+
+    &lt;div id=&quot;field-item&quot; aria-live=&quot;polite&quot;&gt;&lt;span id=&quot;field-item-symbol&quot; class=&quot;item-symbol&quot;&gt;⚡&lt;/span&gt;&lt;span id=&quot;field-item-name&quot; class=&quot;item-name&quot;&gt;연속 턴&lt;/span&gt;&lt;div class=&quot;claim-row&quot;&gt;&lt;button onclick=&quot;claimItem(&#x27;P1&#x27;)&quot;&gt;P1 획득&lt;/button&gt;&lt;button id=&quot;claim-p2&quot; class=&quot;p2&quot; onclick=&quot;claimItem(&#x27;P2&#x27;)&quot;&gt;P2 획득&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;
+    &lt;div id=&quot;item-toast&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;
+    &lt;div id=&quot;intercept-help&quot; hidden&gt;&lt;/div&gt;
+
+
+    &lt;!-- 턴 안내 팝업 배너 --&gt;
+    &lt;div id=&quot;turn-banner&quot; class=&quot;absolute top-16 left-1/2 transform -translate-x-1/2 bg-slate-900/80 backdrop-blur text-white px-6 py-2 rounded-full font-black text-sm tracking-wider shadow-xl transition-all duration-300 pointer-events-none opacity-0 z-30&quot;&gt;
+      🎮 P1 턴 시작!
+    &lt;/div&gt;
+
+    &lt;!-- 체력바 (상단 좌/우) --&gt;
+    &lt;div id=&quot;health-hud&quot; class=&quot;absolute top-3 left-4 right-4 flex justify-between pointer-events-none z-10 max-w-5xl mx-auto&quot;&gt;
+      &lt;!-- P1 체력 --&gt;
+      &lt;div class=&quot;glass-card p-3 rounded-2xl w-44 sm:w-56 backdrop-blur&quot;&gt;
+        &lt;div class=&quot;flex justify-between items-center text-xs font-black text-sky-700 mb-1.5&quot;&gt;
+          &lt;span&gt;&lt;i class=&quot;fa-solid fa-feather mr-1&quot;&gt;&lt;/i&gt; &lt;span id=&quot;p1-name-label&quot;&gt;1-3반&lt;/span&gt;&lt;/span&gt;
+          &lt;span id=&quot;p1-hp-text&quot; class=&quot;text-slate-700&quot;&gt;100 HP&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;w-full bg-slate-200 h-3 rounded-full overflow-hidden p-0.5 border border-white&quot;&gt;
+          &lt;div id=&quot;p1-hp-bar&quot; class=&quot;bg-gradient-to-r from-sky-400 to-blue-500 h-full w-full rounded-full transition-all duration-300&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      &lt;!-- P2 / AI 체력 --&gt;
+      &lt;div class=&quot;glass-card p-3 rounded-2xl w-44 sm:w-56 backdrop-blur text-right&quot;&gt;
+        &lt;div class=&quot;flex justify-between items-center text-xs font-black text-rose-600 mb-1.5&quot;&gt;
+          &lt;span id=&quot;p2-hp-text&quot; class=&quot;text-slate-700&quot;&gt;100 HP&lt;/span&gt;
+          &lt;span&gt;&lt;span id=&quot;p2-name-label&quot;&gt;AI 보트&lt;/span&gt; &lt;i class=&quot;fa-solid fa-robot ml-1&quot;&gt;&lt;/i&gt;&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;w-full bg-slate-200 h-3 rounded-full overflow-hidden p-0.5 border border-white&quot;&gt;
+          &lt;div id=&quot;p2-hp-bar&quot; class=&quot;bg-gradient-to-r from-rose-400 to-pink-500 h-full w-full rounded-full transition-all duration-300&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;!-- 게임 화면 내부 전술 조작 패널 --&gt;
+    &lt;div id=&quot;battle-controls&quot;&gt;
+  &lt;!-- 좌우 이동: 공격 대신 턴 소비 --&gt;
+  &lt;div id=&quot;move-panel&quot;&gt;
+    &lt;button id=&quot;move-left&quot; onclick=&quot;moveCharacter(-1)&quot; class=&quot;glass-card px-3 py-2 rounded-xl font-black text-slate-800 btn-pop text-sm&quot; title=&quot;왼쪽으로 이동하고 턴 종료&quot;&gt;◀ 걷기&lt;/button&gt;
+
+    &lt;button id=&quot;move-right&quot; onclick=&quot;moveCharacter(1)&quot; class=&quot;glass-card px-3 py-2 rounded-xl font-black text-slate-800 btn-pop text-sm&quot; title=&quot;오른쪽으로 이동하고 턴 종료&quot;&gt;걷기 ▶&lt;/button&gt;
+  &lt;/div&gt;
+
+  &lt;!-- 하단 무기 선택 패널 (수량 제한 적용) --&gt;
+  &lt;div id=&quot;weapon-panel&quot; class=&quot;glass-card rounded-2xl p-1.5&quot;&gt;
+    &lt;div class=&quot;flex w-full items-stretch gap-1&quot;&gt;
+      &lt;!-- 1. 기본탄 (무한) --&gt;
+      &lt;button onclick=&quot;selectWeapon(&#x27;normal&#x27;)&quot; id=&quot;wpn-normal&quot; class=&quot;weapon-btn active flex-1 py-2 rounded-2xl flex flex-col items-center justify-center btn-pop&quot;&gt;
+        &lt;span class=&quot;text-lg&quot;&gt;🐥&lt;/span&gt;
+        &lt;span class=&quot;text-[11px] font-black text-slate-700 mt-0.5&quot;&gt;기본탄&lt;/span&gt;
+        &lt;span class=&quot;text-[9px] font-bold text-sky-600&quot;&gt;무한 (∞)&lt;/span&gt;
+      &lt;/button&gt;
+
+      &lt;!-- 2. 레드탄 (3발 분열 / 총 최대 90 데미지) --&gt;
+      &lt;button onclick=&quot;selectWeapon(&#x27;triple&#x27;)&quot; id=&quot;wpn-triple&quot; class=&quot;weapon-btn flex-1 py-2 rounded-2xl flex flex-col items-center justify-center btn-pop&quot;&gt;
+        &lt;span class=&quot;text-lg&quot;&gt;🔴&lt;/span&gt;
+        &lt;span class=&quot;text-[11px] font-black text-slate-700 mt-0.5&quot;&gt;레드탄&lt;/span&gt;
+        &lt;span class=&quot;text-[9px] font-bold text-rose-600&quot; id=&quot;count-triple&quot;&gt;잔여: 3발&lt;/span&gt;
+      &lt;/button&gt;
+
+      &lt;!-- 3. 대형 바위탄 (수량 제한) --&gt;
+      &lt;button onclick=&quot;selectWeapon(&#x27;rock&#x27;)&quot; id=&quot;wpn-rock&quot; class=&quot;weapon-btn flex-1 py-2 rounded-2xl flex flex-col items-center justify-center btn-pop&quot;&gt;
+        &lt;span class=&quot;text-lg&quot;&gt;🪨&lt;/span&gt;
+        &lt;span class=&quot;text-[11px] font-black text-slate-700 mt-0.5&quot;&gt;대형바위탄&lt;/span&gt;
+        &lt;span class=&quot;text-[9px] font-bold text-rose-600&quot; id=&quot;count-rock&quot;&gt;잔여: 3발&lt;/span&gt;
+      &lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+    &lt;/div&gt;
+  &lt;/main&gt;
+
+  &lt;!-- GAMEOVER MODAL --&gt;
+  &lt;div id=&quot;modal-gameover&quot; class=&quot;fixed inset-0 z-50 hidden flex items-center justify-center bg-sky-900/40 backdrop-blur-md p-4&quot;&gt;
+    &lt;div class=&quot;glass-card p-8 max-w-sm w-full rounded-3xl text-center space-y-6 shadow-2xl border-4 border-white&quot;&gt;
+      &lt;div class=&quot;w-20 h-20 bg-amber-400 text-white rounded-full flex items-center justify-center mx-auto text-4xl shadow-lg animate-bounce&quot;&gt;
+        &lt;i class=&quot;fa-solid fa-trophy&quot;&gt;&lt;/i&gt;
+      &lt;/div&gt;
+      &lt;div&gt;
+        &lt;h2 class=&quot;text-2xl font-black text-slate-800&quot; id=&quot;winner-text&quot;&gt;1학년 3반 승리!&lt;/h2&gt;
+        &lt;p class=&quot;text-xs font-bold text-slate-500 mt-2&quot; id=&quot;winner-subtext&quot;&gt;전략적 특수탄 운용으로 승리를 거머쥐었습니다.&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;button onclick=&quot;resetGame()&quot; class=&quot;w-full py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-base shadow-lg shadow-sky-500/30 btn-pop&quot;&gt;
+        🎮 다시 한 판 더!
+      &lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    // ==========================================
+    // 1. GAME STATE &amp; BALANCING SCHEMA
+    // ==========================================
+    const canvas = document.getElementById(&#x27;gameCanvas&#x27;);
+    const ctx = canvas.getContext(&#x27;2d&#x27;);
+
+    let isAiMode = true;
+    let turn = &#x27;P1&#x27;;
+    let isFiring = false;
+    let isAiming = false;
+    let activePointerId = null;
+    let gameFinished = false;
+    let movementState = null;
+    let matchToken = 0;
+    let animationToken = 0;
+    const MAX_PULL = 115;
+    const MAX_POWER = 22;
+    let landscapeSeed = 1337;
+    let aimStart = { x: 0, y: 0 };
+    let aimCurrent = { x: 0, y: 0 };
+
+    // 무기 스펙 및 수량 제한 (플레이어/AI 각각 독립 관리)
+    let ammo = {
+      P1: { triple: 3, rock: 3 },
+      P2: { triple: 3, rock: 3 }
+    };
+
+    const weaponSpecs = {
+      normal: { name: &#x27;기본탄&#x27;, radius: 10, damage: 48, explosionRadius: 76, terrainDamage: 36, color: &#x27;#f59e0b&#x27; },
+      triple: { name: &#x27;레드탄&#x27;, radius: 8, damage: 90, explosionRadius: 66, terrainDamage: 5, color: &#x27;#ff1744&#x27; },
+      rock: { name: &#x27;대형바위탄&#x27;, radius: 16, damage: 70, explosionRadius: 115, terrainDamage: 30, color: &#x27;#475569&#x27; }
+    };
+
+    let selectedWeapon = &#x27;normal&#x27;;
+    const items={P1:{double:0,perfect:0},P2:{double:0,perfect:0}};
+    let fieldItem=null, itemTimer=null, itemSerial=0, aiItemTimer=null;
+    const boostArmed={P1:false,P2:false};
+    let extraTurnOwner=null, extraTurnPending=false, perfectActive=false, perfectTarget=null, aimWarn=false;
+    function itemNotice(message) {
+      const el=document.getElementById(&#x27;item-toast&#x27;);el.textContent=message;el.style.opacity=&#x27;1&#x27;;
+      const token=matchToken;setTimeout(()=&gt;{if(token===matchToken)el.style.opacity=&#x27;0&#x27;},1700);
+    }
+    function updateItemUI(){
+      const side=turn;
+      for(const name of [&#x27;double&#x27;,&#x27;perfect&#x27;]) {
+        const el=document.getElementById(&#x27;item-&#x27;+name);
+        const owner=side;
+        const count=items[owner][name];
+        const canBoost=name===&#x27;perfect&#x27;&amp;&amp;!isFiring&amp;&amp;!movementState&amp;&amp;!gameFinished &amp;&amp; !(isAiMode &amp;&amp; owner===&#x27;P2&#x27;);
+        el.textContent=(name===&#x27;double&#x27;?&#x27;⚡ 연속 턴 &#x27;:&#x27;💥 피해 +50 &#x27;)+count;
+        el.title=name===&#x27;perfect&#x27;?&#x27;다음 한 발의 폭발·직격 피해 +50 HP, 파편 피해 +50%&#x27;:&#x27;사용하면 한 턴 더 행동합니다&#x27;;
+        el.disabled=name===&#x27;double&#x27; ? (gameFinished||isFiring||isAiming||!!movementState||(isAiMode&amp;&amp;turn===&#x27;P2&#x27;)||!count) : (!canBoost||(!count &amp;&amp; !boostArmed[owner]));
+        if(name===&#x27;perfect&#x27;) el.classList.toggle(&#x27;boost-armed&#x27;,!!boostArmed[owner]);
+      }
+    }
+    function scheduleFieldItem(){
+      clearTimeout(itemTimer);
+      if(gameFinished)return;
+      const token=matchToken;
+      itemTimer=setTimeout(()=&gt;{
+        if(token!==matchToken||gameFinished)return;
+        if(fieldItem||isFiring||movementState){scheduleFieldItem();return;}
+        spawnFieldItem();
+      },9000+Math.random()*6500);
+    }
+    function spawnFieldItem(){
+      const type=Math.random()&lt;.5?&#x27;double&#x27;:&#x27;perfect&#x27;;
+      const x=canvas.width*(.27+Math.random()*.46),y=canvas.height*(.26+Math.random()*.25);
+      const id=++itemSerial;fieldItem={type,id};
+      const el=document.getElementById(&#x27;field-item&#x27;);el.style.left=x+&#x27;px&#x27;;el.style.top=y+&#x27;px&#x27;;el.style.display=&#x27;block&#x27;;
+      document.getElementById(&#x27;field-item-symbol&#x27;).textContent=type===&#x27;double&#x27;?&#x27;⚡&#x27;:&#x27;💥&#x27;;
+      document.getElementById(&#x27;field-item-name&#x27;).textContent=type===&#x27;double&#x27;?&#x27;연속 2턴&#x27;:&#x27;피해 +50&#x27;;
+      document.getElementById(&#x27;claim-p2&#x27;).style.display=isAiMode?&#x27;none&#x27;:&#x27;&#x27;;
+      // AI와 대결 중에는 플레이어가 2~4초 사이에 먼저 누르면 획득한다.
+      if(isAiMode) {
+        clearTimeout(aiItemTimer);const token=matchToken;
+        aiItemTimer=setTimeout(()=&gt;{if(token===matchToken&amp;&amp;fieldItem?.id===id)claimItem(&#x27;P2&#x27;,true)},2100+Math.random()*1700);
+      }
+      setTimeout(()=&gt;{if(fieldItem?.id===id){fieldItem=null;el.style.display=&#x27;none&#x27;;scheduleFieldItem()}},7600);
+    }
+    function claimItem(owner,ai=false){
+      if(!fieldItem||gameFinished||(isAiMode&amp;&amp;owner===&#x27;P2&#x27;&amp;&amp;!ai))return;
+      const type=fieldItem.type;
+      items[owner][type]=Math.min(2,items[owner][type]+1);
+      fieldItem=null;clearTimeout(aiItemTimer);
+      document.getElementById(&#x27;field-item&#x27;).style.display=&#x27;none&#x27;;
+      itemNotice(`${owner===&#x27;P1&#x27;?tanks.P1.name:tanks.P2.name} · ${type===&#x27;double&#x27;?&#x27;⚡ 연속 턴&#x27;:&#x27;💥 피해 +50&#x27;} 획득!`);
+      updateItemUI();scheduleFieldItem();
+    }
+    // 상대가 발사한 탄 중 하나를 선택하면, 수비 진영에서 요격미사일을 발사한다.
+    let interceptSelecting=false, interceptor=null;
+    let interceptFlash=0;
+    function useItem(type, ai=false){
+      if(gameFinished)return;
+      if(type===&#x27;double&#x27;){
+        if(isFiring||isAiming||movementState||(isAiMode&amp;&amp;turn===&#x27;P2&#x27;&amp;&amp;!ai)||!items[turn].double||extraTurnPending)return;
+        items[turn].double--;extraTurnOwner=turn;extraTurnPending=true;
+        itemNotice(&#x27;⚡ 이번 행동 후 한 번 더!&#x27;);
+      }else if(type===&#x27;perfect&#x27;){
+        if(isFiring||movementState||(isAiMode&amp;&amp;turn===&#x27;P2&#x27;&amp;&amp;!ai))return;
+        if(boostArmed[turn]){
+          boostArmed[turn]=false;
+          itemNotice(&#x27;💥 공격 강화 취소 · 아이템 보유 유지&#x27;);
+        }else{
+          if(!items[turn].perfect)return;
+          boostArmed[turn]=true;
+          itemNotice(&#x27;💥 다음 발사 피해 +50 HP · 파편 +50%&#x27;);
+        }
+      }
+      updateItemUI();
+    }
+    function launchInterceptor(owner,target){
+      if(!target||!projectiles.includes(target)||!items[owner].perfect||interceptor)return false;
+      items[owner].perfect--;
+      interceptor={owner,target,x:tanks[owner].x,y:tanks[owner].y-28,trail:[],age:0};
+      interceptSelecting=false;document.body.classList.remove(&#x27;intercept-choosing&#x27;);
+      itemNotice(&#x27;💥 피해 +50 발사!&#x27;);
+      playSound(&#x27;shoot&#x27;);updateItemUI();return true;
+    }
+    function updateInterceptor(){
+      if(!interceptor)return;
+      const m=interceptor;m.age++;
+      if(!projectiles.includes(m.target)) {interceptor=null;return;}
+      // 표적탄의 다음 위치를 예측하고 빠르게 추적한다.
+      const tx=m.target.x + (m.target.vx||0)*2,ty=m.target.y+(m.target.vy||0)*2;
+      const dx=tx-m.x,dy=ty-m.y,d=Math.hypot(dx,dy)||1;
+      const step=Math.min(26,d);
+      m.x+=dx/d*step;m.y+=dy/d*step;
+      m.trail.push({x:m.x,y:m.y});if(m.trail.length&gt;16)m.trail.shift();
+      if(Math.hypot(m.x-m.target.x,m.y-m.target.y)&lt;22 || d&lt;25){
+        const p=m.target;
+        projectiles=projectiles.filter(q=&gt;q!==p);
+        explosions.push({x:p.x,y:p.y,radius:4,maxRadius:38,alpha:1,color:&#x27;#38bdf8&#x27;});
+        for(let i=0;i&lt;23;i++){
+          const a=Math.random()*Math.PI*2,v=Math.random()*6+2;
+          particles.push({x:p.x,y:p.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,alpha:1,radius:Math.random()*3+1,color:i%2?&#x27;#e0f2fe&#x27;:&#x27;#38bdf8&#x27;});
+        }
+        playSound(&#x27;intercept&#x27;);recordImpact(p.x,p.y,&#x27;요격 성공&#x27;);
+        itemNotice(&#x27;💥 적 탄환 요격 성공!&#x27;);interceptor=null;
+      } else if(m.age&gt;230 || m.x&lt; -20 || m.x&gt;canvas.width+20){interceptor=null;}
+    }
+    function drawInterceptor(){
+      if(interceptSelecting){
+        ctx.save();ctx.strokeStyle=&#x27;#fef08a&#x27;;ctx.lineWidth=2;ctx.setLineDash([6,5]);
+        for(const p of projectiles){ctx.beginPath();ctx.arc(p.x,p.y,p.spec.radius+20,0,Math.PI*2);ctx.stroke();}
+        ctx.restore();
+      }
+      if(!interceptor)return;
+      const m=interceptor;
+      ctx.save();ctx.beginPath();m.trail.forEach((p,i)=&gt;i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+      ctx.strokeStyle=&#x27;#bae6fd&#x27;;ctx.lineWidth=5;ctx.shadowColor=&#x27;#38bdf8&#x27;;ctx.shadowBlur=12;ctx.stroke();
+      ctx.translate(m.x,m.y);const a=Math.atan2(m.target.y-m.y,m.target.x-m.x);ctx.rotate(a);
+      ctx.fillStyle=&#x27;#e2e8f0&#x27;;ctx.beginPath();ctx.moveTo(15,0);ctx.lineTo(-9,-6);ctx.lineTo(-6,6);ctx.closePath();ctx.fill();
+      ctx.fillStyle=&#x27;#f97316&#x27;;ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(-20,-5);ctx.lineTo(-20,5);ctx.fill();
+      ctx.restore();
+    }
+    function trajectoryWillExit(angle,power){
+      const a=tanks[turn],enemy=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
+      let x=a.x,y=a.y-12,vx=Math.cos(angle)*power,vy=Math.sin(angle)*power;
+      for(let i=0;i&lt;520;i++){
+        vx+=parseFloat(wind)*.006;vy+=gravity;x+=vx;y+=vy;
+        if(x&lt;-20||x&gt;canvas.width+20)return true;
+        if(Math.hypot(x-enemy.x,y-(enemy.y-12))&lt;24)return false;
+        if(x&gt;=0&amp;&amp;x&lt;=canvas.width&amp;&amp;(hitCover(x,y,10)||y&gt;=getTerrainY(x)))return false;
+        if(y&gt;canvas.height+40)return false;
+      }
+      return true;
+    }
+    function updateAimWarning(){
+      const el=document.getElementById(&#x27;aim-warning&#x27;);
+      const dx=aimStart.x-aimCurrent.x,dy=aimStart.y-aimCurrent.y;
+      aimWarn=isAiming&amp;&amp;Math.hypot(dx,dy)&gt;15&amp;&amp;trajectoryWillExit(Math.atan2(dy,dx),Math.min(Math.hypot(dx,dy)/MAX_PULL,1)*MAX_POWER);
+      el.classList.toggle(&#x27;show&#x27;,aimWarn);
+    }
+
+
+    const gravity = 0.24;
+    let wind = (Math.random() * 4 - 2).toFixed(1);
+
+    let tanks = {
+      P1: { x: 120, y: 0, hp: 100, maxHp: 100, color: &#x27;#0284c7&#x27;, name: &#x27;1-3반&#x27; },
+      P2: { x: 0, y: 0, hp: 100, maxHp: 100, color: &#x27;#e11d48&#x27;, name: &#x27;AI 보트&#x27; }
+    };
+
+    let projectiles = [];
+    let particles = [];
+    let debris = []; // 실제 포물선 운동과 충돌 판정이 있는 지형 파편
+    let explosions = [];
+    let terrainPoints = [];
+    // 아래 18%는 깊은 낙하 구역: 지표면이 여기까지 무너지면 땅이 뚫린다.
+    const PIT_LEVEL = 0.82;
+    const pitLimit = () =&gt; canvas.height * PIT_LEVEL;
+    let fallingTanks = {};
+    let pitWarningUntil = 0;
+    let bgParticles = [];
+    let coverRocks = [];
+    const shotHistory = {P1:null, P2:null};
+    let activeShot = null;
+    let showPreviousTrajectory = true;
+    const GUIDE_STEPS = 32; // 방향만 참고할 수 있도록 축소: 착탄점은 비공개
+
+
+    let audioCtx = null;
+
+    // ==========================================
+    // 2. CANVAS RESIZING &amp; TERRAIN GENERATION
+    // ==========================================
+    function resizeCanvas() {
+      const container = document.getElementById(&#x27;game-container&#x27;);
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      if(fieldItem){document.getElementById(&#x27;field-item&#x27;).style.left=(canvas.width*.5)+&#x27;px&#x27;;document.getElementById(&#x27;field-item&#x27;).style.top=(canvas.height*.38)+&#x27;px&#x27;;}
+      generateTerrain();
+      initBgParticles();
+      repositionTanks(!positionsInitialized);
+      setupCoverRocks();
+      draw();
+    }
+
+    function generateTerrain() {
+      terrainPoints = [];
+      const w = canvas.width;
+      const h = canvas.height;
+      const pitTop = pitLimit() - 36;
+      const step = 3;
+      const twoPi = Math.PI * 2;
+
+      // landscapeSeed를 기반으로 매 판 다른 지형을 만들되, 같은 판에서는 항상 동일하게 유지.
+      const base = h * (0.54 + noise1(11) * 0.12);
+      const longAmp = h * (0.05 + noise1(12) * 0.07);
+      const midAmp = h * (0.025 + noise1(13) * 0.05);
+      const smallAmp = h * (0.01 + noise1(14) * 0.025);
+      const longFreq = 0.55 + noise1(15) * 1.1;
+      const midFreq = 1.3 + noise1(16) * 2.0;
+      const smallFreq = 3.0 + noise1(17) * 3.4;
+      const p1 = noise1(18) * twoPi;
+      const p2 = noise1(19) * twoPi;
+      const p3 = noise1(20) * twoPi;
+
+      const featureCount = 3 + Math.floor(noise1(21) * 3); // 3~5개 지형 특징
+      const features = [];
+      for (let i = 0; i &lt; featureCount; i++) {
+        features.push({
+          center: w * (0.08 + noise1(30 + i * 5) * 0.84),
+          width: w * (0.08 + noise1(31 + i * 5) * 0.18),
+          height: h * (0.05 + noise1(32 + i * 5) * 0.14),
+          sign: noise1(33 + i * 5) &gt; 0.45 ? -1 : 1 // -1 언덕, 1 골짜기
+        });
+      }
+
+      for (let x = 0; x &lt;= w; x += step) {
+        const nx = x / w;
+        let y = base
+          + Math.sin(nx * twoPi * longFreq + p1) * longAmp
+          + Math.sin(nx * twoPi * midFreq + p2) * midAmp
+          + Math.cos(nx * twoPi * smallFreq + p3) * smallAmp;
+
+        // 봉우리/골짜기를 추가해 판마다 체감이 확실히 다르도록 함.
+        for (const f of features) {
+          const dx = (x - f.center) / f.width;
+          y += f.sign * Math.exp(-dx * dx * 2.2) * f.height;
+        }
+
+        // 가장자리는 약간 안정적으로 만들어 시작 지점이 너무 가파르지 않게 완화.
+        const edgeFactor = Math.min(1, Math.min(nx, 1 - nx) / 0.12);
+        const edgeLift = (1 - edgeFactor) * h * 0.035;
+        y += edgeLift;
+
+        // 너무 들쭉날쭉하지 않게 범위를 제한.
+        y = Math.max(h * 0.18, Math.min(y, pitTop));
+        terrainPoints.push({ x: x, y: y, broken:false });
+      }
+
+      // 한 번 가볍게 스무딩해서 전차가 설 수 있는 자연스러운 곡선으로 만듦.
+      for (let i = 2; i &lt; terrainPoints.length - 2; i++) {
+        const avg = (
+          terrainPoints[i - 2].y +
+          terrainPoints[i - 1].y +
+          terrainPoints[i].y * 2 +
+          terrainPoints[i + 1].y +
+          terrainPoints[i + 2].y
+        ) / 6;
+        terrainPoints[i].y = Math.min(pitTop, avg);
+      }
+    }
+
+    function getTerrainY(x) {
+      if (terrainPoints.length === 0) return canvas.height * 0.7;
+      const index = Math.floor((x / canvas.width) * (terrainPoints.length - 1));
+      const clamped = Math.max(0, Math.min(index, terrainPoints.length - 1));
+      return terrainPoints[clamped].broken ? canvas.height+110 : terrainPoints[clamped].y;
+    }
+
+    // 매 판 독립적으로 시작 위치를 뽑는다. 일정 확률로 두 캐릭터가 바로 옆에서 시작한다.
+    // 실제 캐릭터 반지름(16px)을 고려해 겹침만 방지한다.
+    let positionsInitialized = false;
+    function repositionTanks(randomize = true) {
+      const w = canvas.width;
+      const margin = Math.min(42, Math.max(20, w * 0.075));
+      const usable = Math.max(1, w - margin * 2);
+      const minGap = Math.min(36, usable * 0.65);
+      const range = () =&gt; margin + Math.random() * usable;
+
+      if (randomize || !positionsInitialized) {
+        let a, b;
+        // 약 8%만 초근접 시작(캐릭터가 닿을 듯한 36~70px 거리)
+        if (Math.random() &lt; 0.08 &amp;&amp; usable &gt; minGap + 2) {
+          const gap = Math.min(usable, minGap + Math.random() * Math.min(34, usable - minGap));
+          a = margin + Math.random() * Math.max(0, usable - gap);
+          b = a + gap;
+        } else {
+          a = range();
+          b = range();
+          // 일반 경기에서는 근접 시작을 배제해 실제 근접 빈도가 8%를 넘지 않도록 한다.
+          const safeGap=Math.min(usable*.68,Math.max(125,usable*.28));
+          for (let n = 0; n &lt; 100 &amp;&amp; Math.abs(a - b) &lt; safeGap; n++) b = range();
+          if (Math.abs(a - b) &lt; safeGap) b = a &lt; w / 2 ? Math.min(w - margin, a + safeGap) : Math.max(margin, a - safeGap);
+        }
+        // P1이 반드시 왼쪽일 필요는 없다. 좌우가 뒤바뀌기도 한다.
+        if (Math.random() &lt; 0.5) [a, b] = [b, a];
+        tanks.P1.x = a;
+        tanks.P2.x = b;
+        positionsInitialized = true;
+      } else {
+        // 브라우저 창 크기가 변해도 캐릭터를 새 위치로 순간이동시키지 않는다.
+        const left = margin, right = w - margin;
+        tanks.P1.x = Math.max(left, Math.min(right, tanks.P1.x));
+        tanks.P2.x = Math.max(left, Math.min(right, tanks.P2.x));
+      }
+      tanks.P1.y = getTerrainY(tanks.P1.x);
+      tanks.P2.y = getTerrainY(tanks.P2.x);
+    }
+
+    function setupCoverRocks() {
+      const r = Math.max(19, Math.min(30, canvas.width * 0.034));
+      coverRocks = [];
+      for (const [i,owner] of [&#x27;P1&#x27;,&#x27;P2&#x27;].entries()) {
+        const t=tanks[owner], other=tanks[owner===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
+        const outward = Math.sign(t.x-other.x) || (i===0?-1:1);
+        let best = null;
+        // 가까운 배치에서도 엄폐 바위가 캐릭터를 덮지 않도록 후보 위치를 확인한다.
+        for (const dist of [Math.max(52,r+28), Math.max(70,r+43), Math.max(90,r+60)]) {
+          for (const dir of [outward,-outward]) {
+            const x=t.x+dir*dist;
+            if (x&lt;r+4 || x&gt;canvas.width-r-4) continue;
+            if ([&#x27;P1&#x27;,&#x27;P2&#x27;].some(k=&gt;Math.abs(x-tanks[k].x)&lt;r+21)) continue;
+            if (coverRocks.some(rock=&gt;Math.abs(x-rock.x)&lt;r+rock.r+8)) continue;
+            best=x;break;
+          }
+          if (best!==null) break;
+        }
+        if (best!==null) coverRocks.push({owner,x:best,r,hp:65,maxHp:65,seed:i*27+landscapeSeed*.03});
+      }
+    }
+    function coverCenter(rock) {
+      return {x:rock.x,y:getTerrainY(rock.x)-rock.r*0.63};
+    }
+    function hitCover(x,y,r=0) {
+      for(const rock of coverRocks) {
+        if(rock.hp&lt;=0) continue;
+        const c=coverCenter(rock);
+        if(Math.hypot(x-c.x,y-c.y)&lt;=rock.r+r*.6) return rock;
+      }
+      return null;
+    }
+    function rockBlocksBlast(rock, x, y, target) {
+      if(rock.hp&lt;=0 || rock.owner !== target.owner)return false;
+      const c=coverCenter(rock);
+      const tx=target.x,ty=target.y-12;
+      const dx=tx-x,dy=ty-y,len2=dx*dx+dy*dy;
+      if(len2&lt;1)return false;
+      const t=Math.max(0,Math.min(1,((c.x-x)*dx+(c.y-y)*dy)/len2));
+      return t&gt;0.12 &amp;&amp; t&lt;0.95 &amp;&amp; Math.hypot(x+t*dx-c.x,y+t*dy-c.y)&lt;rock.r*.86;
+    }
+    function togglePreviousTrajectory() {
+      showPreviousTrajectory = !showPreviousTrajectory;
+      const btn = document.getElementById(&#x27;trajectory-toggle&#x27;);
+      btn.setAttribute(&#x27;aria-pressed&#x27;, String(showPreviousTrajectory));
+      btn.textContent = showPreviousTrajectory ? &#x27;↗ 이전 탄도 ON&#x27; : &#x27;↗ 이전 탄도 OFF&#x27;;
+    }
+    // 각 플레이어가 직전에 발사한 탄의 실제 궤적만 표시한다.
+    // 조준 예측선과 구별하기 위해 반투명 파란 점선으로 그린다.
+    function drawPreviousTrajectory() {
+      if (!showPreviousTrajectory) return;
+      const shot = shotHistory[turn];
+      if (!shot || shot === activeShot || !shot.paths?.length) return;
+      ctx.save();
+      ctx.lineJoin = &#x27;round&#x27;;
+      ctx.lineCap = &#x27;round&#x27;;
+      ctx.setLineDash([7, 7]);
+      ctx.lineWidth = 2.8;
+      ctx.strokeStyle = &#x27;rgba(14, 116, 144, .72)&#x27;;
+      shot.paths.forEach(path =&gt; {
+        if (path.length &lt; 2) return;
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i &lt; path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      if (shot.impact &amp;&amp; Number.isFinite(shot.impact.x) &amp;&amp; Number.isFinite(shot.impact.y)) {
+        const x=shot.impact.x,y=shot.impact.y;
+        ctx.strokeStyle=&#x27;#ffffff&#x27;;ctx.lineWidth=5;
+        ctx.beginPath();ctx.moveTo(x-7,y-7);ctx.lineTo(x+7,y+7);ctx.moveTo(x+7,y-7);ctx.lineTo(x-7,y+7);ctx.stroke();
+        ctx.strokeStyle=&#x27;#0891b2&#x27;;ctx.lineWidth=2.6;ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function appendShotPoint(p) {
+      if (!activeShot || activeShot.shooter!==turn || !activeShot.paths) return;
+      const path=activeShot.paths[p.pathId];
+      if (!path || path.length &gt;= 500) return;
+      const prev=path[path.length-1];
+      if (!prev || Math.hypot(p.x-prev.x,p.y-prev.y)&gt;=4) path.push({x:p.x,y:p.y});
+    }
+    function updateShotPanel() {
+      const el=document.getElementById(&#x27;shot-history&#x27;);
+      const h=shotHistory[turn];
+      if(!h) {el.textContent=&#x27;직전: 기록 없음&#x27;;return;}
+      el.textContent=`직전 각도 ${h.angle}°  |  ${h.impact?h.impact.label:&#x27;비행&#x27;}  ·  힘은 캐릭터 옆`; 
+    }
+    function updateLiveAim() {
+      const el=document.getElementById(&#x27;shot-live&#x27;);
+      if(!isAiming) {el.textContent=&#x27;이번: 캐릭터를 당겨 조준&#x27;;return;}
+      const dx=aimStart.x-aimCurrent.x,dy=aimStart.y-aimCurrent.y;
+      const angle=Math.round(Math.atan2(-dy,Math.abs(dx))*180/Math.PI);
+      const power=Math.round(Math.min(Math.hypot(dx,dy)/MAX_PULL,1)*100);
+      const old=shotHistory[turn];
+      if(!old) {el.textContent=`이번  각도 ${angle}°  |  힘 ${power}%`;return;}
+      const da=angle-old.angle,dp=power-old.power;
+      el.textContent=`이번  각도 ${angle}° (${da&gt;=0?&#x27;+&#x27;:&#x27;&#x27;}${da}°)  |  힘 ${power}% (${dp&gt;=0?&#x27;+&#x27;:&#x27;&#x27;}${dp}%)`;
+    }
+    function updateMovementUI() {
+      const disabled=gameFinished || Object.keys(fallingTanks).length&gt;0 || isFiring || isAiming || !!movementState || (isAiMode &amp;&amp; turn===&#x27;P2&#x27;);
+      const t=tanks[turn],enemy=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
+      for(const dir of [-1,1]) {
+        const btn=document.getElementById(dir&lt;0?&#x27;move-left&#x27;:&#x27;move-right&#x27;);
+        const nx=t.x+dir*42;
+        const blocked=nx&lt;35||nx&gt;canvas.width-35||Math.abs(nx-enemy.x)&lt;65||(getTerrainY(nx)&gt;pitLimit()-12 || Math.abs(getTerrainY(nx)-t.y)&gt;100);
+        btn.disabled=disabled||blocked;
+        btn.style.opacity=btn.disabled?&#x27;.42&#x27;:&#x27;1&#x27;;
+      }
+      // 이동은 공격 대신 한 턴을 사용한다.
+    }
+    function moveCharacter(dir, ai=false) {
+      if(gameFinished || Object.keys(fallingTanks).length || isFiring || isAiming || movementState || (isAiMode &amp;&amp; turn===&#x27;P2&#x27; &amp;&amp; !ai)) return false;
+      const t=tanks[turn], enemy=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
+      const nx=t.x+(dir&lt;0?-42:42);
+      if(nx&lt;35 || nx&gt;canvas.width-35 || Math.abs(nx-enemy.x)&lt;65 || (getTerrainY(nx)&gt;pitLimit()-12 || Math.abs(getTerrainY(nx)-t.y)&gt;100))return false;
+      perfectActive=false;updateItemUI();
+      // 매 프레임 보간하며 지형 높이를 따라 걷는다. 도착 후에만 턴 종료.
+      movementState={key:turn,from:t.x,to:nx,dir:Math.sign(nx-t.x),elapsed:0,duration:560,lastDust:0};
+      isFiring=true;
+      updateMovementUI();
+      const banner=document.getElementById(&#x27;turn-banner&#x27;);
+      banner.textContent=`🚶 ${t.name} 이동 중`;
+      banner.style.opacity=&#x27;1&#x27;;
+      return true;
+    }
+    function animateMovement(dt) {
+      if(!movementState)return;
+      const m=movementState,t=tanks[m.key];
+      m.elapsed+=Math.min(dt,45);
+      const fraction=Math.min(1,m.elapsed/m.duration);
+      const eased=fraction&lt;0.5?2*fraction*fraction:1-Math.pow(-2*fraction+2,2)/2;
+      t.x=m.from+(m.to-m.from)*eased;
+      t.y=getTerrainY(t.x);
+      t.walkFrame=m.elapsed;
+      t.facing=m.dir;
+      if(m.elapsed-m.lastDust&gt;65){
+        m.lastDust=m.elapsed;
+        for(let i=0;i&lt;2;i++)particles.push({x:t.x-m.dir*9,y:t.y-3,vx:(Math.random()-.5)*2-m.dir,vy:-Math.random()*2,alpha:0.75,radius:Math.random()*2+1,color:&#x27;#cbd5e1&#x27;});
+      }
+      if(fraction&gt;=1){
+        t.x=m.to;t.y=getTerrainY(t.x);t.walkFrame=0;
+        movementState=null;
+        isFiring=false;
+        endTurn();
+      }
+    }
+    function recordImpact(x,y,label) {
+      if(!activeShot || activeShot.shooter!==turn)return;
+      if(!activeShot.impact || Math.abs(x-tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;].x)&lt;Math.abs(activeShot.impact.x-tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;].x)) {
+        const opponent=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
+        const from=tanks[turn];
+        const forward=(x-from.x)*Math.sign(opponent.x-from.x);
+        const targetDistance=Math.abs(opponent.x-from.x);
+        const relation=label===&#x27;상대 명중&#x27;?&#x27;적중&#x27;:forward&lt;targetDistance-30?&#x27;짧음&#x27;:forward&gt;targetDistance+30?&#x27;넘어감&#x27;:&#x27;목표 부근&#x27;;
+        activeShot.impact={x,y,label:`${label} (${relation})`};
+      }
+    }
+    function initBgParticles() {
+      bgParticles = [];
+      for (let i = 0; i &lt; 15; i++) {
+        bgParticles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height * 0.6,
+          size: Math.random() * 6 + 4,
+          speed: Math.random() * 0.8 + 0.3,
+          type: Math.random() &gt; 0.5 ? &#x27;cloud&#x27; : &#x27;leaf&#x27;
+        });
+      }
+    }
+
+    // ==========================================
+    // 3. ORIGINAL BGM + LAYERED ARCADE SOUND EFFECTS
+    // 모든 음원은 Web Audio API 합성으로 생성 (외부 음원 파일 불필요).
+    // ==========================================
+    let musicEnabled = true;
+    let musicStarted = false;
+    let musicTimer = null;
+    let musicStep = 0;
+    let nextMusicTime = 0;
+    let musicGain = null;
+    let sfxGain = null;
+    let noiseBuffer = null;
+    const BPM = 124;
+    const STEP_TIME = 60 / BPM / 4;  // 16분음표
+
+    function initAudio() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          musicGain = audioCtx.createGain();
+          sfxGain = audioCtx.createGain();
+          musicGain.gain.value = 0.16;
+          sfxGain.gain.value = 0.62;
+          musicGain.connect(audioCtx.destination);
+          sfxGain.connect(audioCtx.destination);
+          const size = audioCtx.sampleRate * 2;
+          noiseBuffer = audioCtx.createBuffer(1, size, audioCtx.sampleRate);
+          const data = noiseBuffer.getChannelData(0);
+          for(let i=0;i&lt;size;i++) data[i] = Math.random()*2 - 1;
+        }
+        if (audioCtx.state === &#x27;suspended&#x27;) audioCtx.resume().catch(()=&gt;{});
+        return !!audioCtx;
+      } catch(e) { return false; }
+    }
+
+    // 실제 사용자의 첫 클릭/터치 이후에만 브라우저 정책에 맞춰 재생.
+    function ensureMusicStarted() {
+      if (!initAudio() || !musicEnabled || musicStarted) return;
+      musicStarted = true;
+      musicStep = 0;
+      nextMusicTime = audioCtx.currentTime + 0.04;
+      musicScheduler();
+      musicTimer = setInterval(musicScheduler, 75);
+    }
+
+    function toggleMusic() {
+      musicEnabled = !musicEnabled;
+      const label = document.getElementById(&#x27;music-label&#x27;);
+      const icon = document.getElementById(&#x27;music-icon&#x27;);
+      const button = document.getElementById(&#x27;btn-music&#x27;);
+      label.textContent = musicEnabled ? &#x27;BGM ON&#x27; : &#x27;BGM OFF&#x27;;
+      icon.className = musicEnabled ? &#x27;fa-solid fa-music&#x27; : &#x27;fa-solid fa-volume-xmark&#x27;;
+      button.setAttribute(&#x27;aria-pressed&#x27;, String(musicEnabled));
+      if (musicEnabled) {
+        if (initAudio()) {
+          musicGain.gain.setTargetAtTime(0.16, audioCtx.currentTime, 0.035);
+          ensureMusicStarted();
+        }
+      } else if(audioCtx &amp;&amp; musicGain) {
+        musicGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.025);
+      }
+    }
+
+    function noteHz(midi) { return 440*Math.pow(2,(midi-69)/12); }
+
+    function tone(freq, time, duration, volume, wave=&#x27;sine&#x27;, output=sfxGain, endFreq=null) {
+      if (!audioCtx || !output) return;
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type=wave;
+      o.frequency.setValueAtTime(Math.max(1,freq),time);
+      if(endFreq) o.frequency.exponentialRampToValueAtTime(Math.max(1,endFreq),time+duration);
+      g.gain.setValueAtTime(0.0001,time);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002,volume),time+Math.min(0.012,duration*0.25));
+      g.gain.exponentialRampToValueAtTime(0.0001,time+duration);
+      o.connect(g);g.connect(output);o.start(time);o.stop(time+duration+0.015);
+    }
+
+    function noise(time,duration,volume,filterType=&#x27;lowpass&#x27;,frequency=900,output=sfxGain) {
+      if (!noiseBuffer || !output) return;
+      const src=audioCtx.createBufferSource(), filt=audioCtx.createBiquadFilter(),g=audioCtx.createGain();
+      src.buffer=noiseBuffer;filt.type=filterType;filt.frequency.setValueAtTime(frequency,time);
+      if(duration&gt;0.08)filt.frequency.exponentialRampToValueAtTime(Math.max(80,frequency*.35),time+duration);
+      g.gain.setValueAtTime(Math.max(0.0002,volume),time);
+      g.gain.exponentialRampToValueAtTime(0.0001,time+duration);
+      src.connect(filt);filt.connect(g);g.connect(output);src.start(time,Math.random()*.8,duration);src.stop(time+duration+0.01);
+    }
+
+    // C장조 / F장조 중심, 4마디 순환하는 자체 제작 밝은 멜로디.
+    const melody=[
+      76,null,79,null,81,null,79,76, 74,null,76,null,79,null,76,null,
+      77,null,81,null,84,81,79,null, 76,null,74,null,72,null,74,null,
+      76,null,79,null,81,null,84,81, 79,null,76,null,74,null,76,null,
+      77,null,79,81,79,null,76,null, 74,null,72,null,76,null,72,null
+    ];
+    const bassRoots=[48,53,57,55]; // C - F - Am - G
+    function scheduleMusicStep(step,time) {
+      const idx=step%64, bar=Math.floor(idx/16),pos=idx%16;
+      const n=melody[idx];
+      if(n!==null) {
+        tone(noteHz(n),time,0.11,0.24,&#x27;triangle&#x27;,musicGain);
+        tone(noteHz(n+12),time,0.065,0.045,&#x27;sine&#x27;,musicGain);
+      }
+      if(pos%4===0) tone(noteHz(bassRoots[bar]-12),time,0.21,0.24,&#x27;triangle&#x27;,musicGain);
+      // 부드러운 킥 + 손뼉 + 하이햇의 리듬
+      if(pos%4===0) tone(122,time,0.13,0.32,&#x27;sine&#x27;,musicGain,46);
+      if(pos===4||pos===12) noise(time,0.09,0.14,&#x27;highpass&#x27;,1400,musicGain);
+      if(pos%2===0) noise(time,0.035,pos%4===0?0.028:0.043,&#x27;highpass&#x27;,5500,musicGain);
+    }
+    function musicScheduler() {
+      if (!audioCtx || !musicStarted || audioCtx.state!==&#x27;running&#x27;) return;
+      let count=0;
+      while(nextMusicTime&lt;audioCtx.currentTime+0.22 &amp;&amp; count++&lt;12) {
+        if(musicEnabled) scheduleMusicStep(musicStep,nextMusicTime);
+        musicStep++;
+        nextMusicTime+=STEP_TIME;
+      }
+      if(count&gt;=12) nextMusicTime=audioCtx.currentTime+0.04;
+    }
+
+    function playSound(type) {
+      if(type===&#x27;intercept&#x27;){
+        if(!initAudio())return;
+        const t=audioCtx.currentTime;
+        noise(t,.28,.50,&#x27;highpass&#x27;,1800);
+        tone(950,t,.17,.55,&#x27;sawtooth&#x27;,sfxGain,130);
+        tone(180,t,.30,.42,&#x27;triangle&#x27;,sfxGain,38);
+        return;
+      }
+      if (!initAudio()) return;
+      const t=audioCtx.currentTime+0.003;
+      if(type===&#x27;shoot&#x27;) {
+        // 탄성 있는 새총 발사
+        tone(740,t,0.13,0.24,&#x27;triangle&#x27;,sfxGain,145);
+        noise(t,0.11,0.16,&#x27;bandpass&#x27;,1400);
+      } else if(type===&#x27;split&#x27;) {
+        // 3개로 분열되는 날카로운 팡팡
+        [0,0.075,0.15].forEach((dt,i)=&gt;{
+          tone(780+i*145,t+dt,0.13,0.19,&#x27;square&#x27;,sfxGain,255+i*40);
+          noise(t+dt,0.075,0.12,&#x27;highpass&#x27;,2200);
+        });
+      } else if(type===&#x27;explosion_normal&#x27;) {
+        // 기본탄: 밝고 단단한 팡 + 짧은 연기
+        noise(t,0.19,0.45,&#x27;bandpass&#x27;,1250);
+        tone(250,t,0.22,0.4,&#x27;triangle&#x27;,sfxGain,70);
+        tone(640,t+0.015,0.085,0.11,&#x27;sine&#x27;,sfxGain,210);
+      } else if(type===&#x27;explosion_triple&#x27;) {
+        // 분열탄: 금속성 연속 파열 + 불꽃 튐
+        noise(t,0.13,0.39,&#x27;highpass&#x27;,1900);
+        tone(520,t,0.14,0.21,&#x27;sawtooth&#x27;,sfxGain,130);
+        noise(t+0.06,0.12,0.18,&#x27;bandpass&#x27;,2600);
+        tone(890,t+0.035,0.1,0.13,&#x27;triangle&#x27;,sfxGain,330);
+      } else if(type===&#x27;explosion_red&#x27;) {
+        // 레드탄: 매우 날카로운 고음 파열 + 짧은 고주파 금속성 스파크
+        noise(t,0.24,0.66,&#x27;highpass&#x27;,3700);
+        tone(1880,t,0.13,0.26,&#x27;square&#x27;,sfxGain,460);
+        tone(2780,t+0.025,0.10,0.14,&#x27;sawtooth&#x27;,sfxGain,780);
+        [0.035,0.09,0.16].forEach((dt,i)=&gt;{
+          noise(t+dt,0.065,0.22-i*.035,&#x27;highpass&#x27;,4800+i*350);
+          tone(2050+i*270,t+dt,0.065,0.09,&#x27;triangle&#x27;,sfxGain,940);
+        });
+      } else if(type===&#x27;explosion_rock&#x27;) {
+        // 대형 바위: 굵은 저음 충격 + 바스러지는 돌조각 + 잔향
+        tone(115,t,0.68,0.65,&#x27;sawtooth&#x27;,sfxGain,31);
+        tone(65,t+0.035,0.58,0.52,&#x27;sine&#x27;,sfxGain,28);
+        noise(t,0.52,0.6,&#x27;lowpass&#x27;,1100);
+        for(let i=0;i&lt;5;i++) {
+          const dt=0.08+i*0.07;
+          noise(t+dt,0.12,0.20-i*.025,&#x27;bandpass&#x27;,420+i*310);
+          tone(210+i*63,t+dt,0.09,0.085,&#x27;triangle&#x27;,sfxGain,75);
+        }
+      } else if(type===&#x27;turn&#x27;) {
+        tone(523,t,0.08,0.09,&#x27;sine&#x27;);tone(659,t+0.085,0.12,0.10,&#x27;sine&#x27;);
+      }
+    }
+
+    // 버튼 클릭, 캔버스 조작 모두 사용자 제스처로 인정.
+    document.addEventListener(&#x27;pointerdown&#x27;,ensureMusicStarted,{passive:true});
+    document.addEventListener(&#x27;keydown&#x27;,ensureMusicStarted);
+
+    // ==========================================
+    // 4. TOUCH &amp; WEAPON CONTROLS
+    // ==========================================
+    function selectWeapon(wpnType) {
+      if (isFiring || gameFinished || Object.keys(fallingTanks).length || movementState) return;
+      
+      // 수량 체크
+      if (wpnType !== &#x27;normal&#x27; &amp;&amp; ammo[turn][wpnType] &lt;= 0) {
+        alert(&quot;해당 특수탄을 모두 소모하였습니다!&quot;);
+        return;
+      }
+
+      selectedWeapon = wpnType;
+      [&#x27;normal&#x27;, &#x27;triple&#x27;, &#x27;rock&#x27;].forEach(w =&gt; {
+        const btn = document.getElementById(`wpn-${w}`);
+        if (w === wpnType) btn.classList.add(&#x27;active&#x27;);
+        else btn.classList.remove(&#x27;active&#x27;);
+      });
+    }
+
+    function updateAmmoUI() {
+      const currentAmmo = ammo[turn];
+      document.getElementById(&#x27;count-triple&#x27;).innerText = `잔여: ${currentAmmo.triple}발`;
+      document.getElementById(&#x27;count-rock&#x27;).innerText = `잔여: ${currentAmmo.rock}발`;
+
+      [&#x27;triple&#x27;, &#x27;rock&#x27;].forEach(w =&gt; {
+        const btn = document.getElementById(`wpn-${w}`);
+        if (currentAmmo[w] &lt;= 0) {
+          btn.classList.add(&#x27;disabled&#x27;);
+        } else {
+          btn.classList.remove(&#x27;disabled&#x27;);
+        }
+      });
+    }
+
+    // 마우스, 터치, 펜을 Pointer Events로 통합한다. 모든 좌표는 캔버스 내부 좌표이다.
+    function pointerPosition(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x:(e.clientX-r.left)*canvas.width/r.width,
+               y:(e.clientY-r.top)*canvas.height/r.height };
+    }
+    function setupTouchEvents() {
+      canvas.addEventListener(&#x27;pointerdown&#x27;, e =&gt; {
+        if (gameFinished) return;
+        if(interceptSelecting){
+          e.preventDefault();
+          const pt=pointerPosition(e);
+          const target=projectiles.reduce((best,p)=&gt;{
+            const d=Math.hypot(p.x-pt.x,p.y-pt.y);
+            return d&lt;best.dist?{dist:d,p}:best;
+          },{dist:Infinity,p:null});
+          if(target.p &amp;&amp; target.dist&lt;65){
+            launchInterceptor(turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;,target.p);
+          }else itemNotice(&#x27;🚀 원으로 표시된 탄을 클릭하세요&#x27;);
+          return;
+        }
+        if (isFiring) {
+          if (selectedWeapon === &#x27;triple&#x27; &amp;&amp; projectiles.length === 1 &amp;&amp; projectiles[0].type === &#x27;triple&#x27;) splitTripleShot();
+          return;
+        }
+        if (isAiMode &amp;&amp; turn === &#x27;P2&#x27; || isAiming) return;
+        const pos = pointerPosition(e), t=tanks[turn];
+        if (Math.hypot(pos.x-t.x,pos.y-(t.y-12)) &gt; 85) return;
+        e.preventDefault();
+        activePointerId=e.pointerId;
+        canvas.setPointerCapture(e.pointerId);
+        isAiming=true;
+        updateMovementUI();
+        aimStart={x:t.x,y:t.y-12};
+        aimCurrent={...aimStart};
+        aimVisualCurrent={...aimStart};
+        aimPointerOrigin=pos;
+        updateAimPosition(pos);
+        updateAimWarning();
+        updateLiveAim();
+      });
+      canvas.addEventListener(&#x27;pointermove&#x27;, e =&gt; {
+        if (!isAiming || e.pointerId !== activePointerId) return;
+        e.preventDefault(); updateAimPosition(pointerPosition(e)); updateAimWarning(); updateLiveAim();
+      });
+      canvas.addEventListener(&#x27;pointerup&#x27;, e =&gt; {
+        if (!isAiming || e.pointerId !== activePointerId) return;
+        e.preventDefault();
+        updateAimPosition(pointerPosition(e));
+        updateAimWarning();
+        updateLiveAim();
+        const dx=aimStart.x-aimCurrent.x,dy=aimStart.y-aimCurrent.y;
+        const length=Math.hypot(dx,dy);
+        isAiming=false; activePointerId=null;
+        updateAimWarning();updateLiveAim();updateMovementUI();
+        if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        if (length &gt;= 10) fireCannon(Math.atan2(dy,dx), Math.min(length/MAX_PULL,1)*MAX_POWER);
+      });
+      canvas.addEventListener(&#x27;pointercancel&#x27;, e =&gt; {
+        if (e.pointerId===activePointerId) {isAiming=false;activePointerId=null;updateAimWarning();updateLiveAim();updateMovementUI();}
+      });
+    }
+    let aimPointerOrigin={x:0,y:0};
+    let aimVisualCurrent={x:0,y:0};
+    function updateAimPosition(pos) {
+      // 화면 경계 근처에서는 동일한 각도를 유지하면서 필요한 실제 당김 거리를 줄인다.
+      // 예: 바닥에 떨어져 30px밖에 당길 수 없어도 화면 끝까지 당기면 100% 출력.
+      const rawX=pos.x-aimPointerOrigin.x, rawY=pos.y-aimPointerOrigin.y;
+      const rawDist=Math.hypot(rawX,rawY);
+      if(rawDist&lt;0.001) {
+        aimCurrent={...aimStart}; aimVisualCurrent={...aimStart}; updateLiveAim(); return;
+      }
+      const ux=rawX/rawDist,uy=rawY/rawDist;
+      const margin=7;
+      const xRoom=ux&gt;0?(canvas.width-margin-aimPointerOrigin.x)/ux:
+                  ux&lt;0?(margin-aimPointerOrigin.x)/ux:Infinity;
+      const yRoom=uy&gt;0?(canvas.height-margin-aimPointerOrigin.y)/uy:
+                  uy&lt;0?(margin-aimPointerOrigin.y)/uy:Infinity;
+      const edgeDistance=Math.max(1,Math.min(xRoom,yRoom));
+      const usablePull=Math.max(18,Math.min(MAX_PULL,edgeDistance));
+      const strength=Math.min(rawDist/usablePull,1);
+      const virtualDist=strength*MAX_PULL;
+      // aimCurrent는 실제 발사 각도/힘을 계산하기 위한 가상 새총 좌표다.
+      aimCurrent={x:aimStart.x+ux*virtualDist,y:aimStart.y+uy*virtualDist};
+      // 고무줄 손잡이는 화면 안에 표시하여 화면 아래로 사라지지 않는다.
+      const drawnDist=Math.min(rawDist,MAX_PULL,edgeDistance);
+      aimVisualCurrent={x:aimStart.x+ux*drawnDist,y:aimStart.y+uy*drawnDist};
+      updateLiveAim();
+    }
+
+    function syncUIWithTurn() {
+      const turnLabel = document.getElementById(&#x27;turn-display&#x27;);
+      const banner = document.getElementById(&#x27;turn-banner&#x27;);
+
+      if (turn === &#x27;P1&#x27;) {
+        turnLabel.innerText = `${tanks.P1.name} 턴`;
+        turnLabel.className = &quot;text-xs sm:text-sm font-black text-sky-600 animate-pulse&quot;;
+        banner.innerText = `🎮 [${tanks.P1.name}]의 차례입니다!`;
+      } else {
+        turnLabel.innerText = isAiMode ? &quot;AI 턴 계산 중&quot; : `${tanks.P2.name} 턴`;
+        turnLabel.className = &quot;text-xs sm:text-sm font-black text-rose-500 animate-pulse&quot;;
+        banner.innerText = isAiMode ? `🤖 AI 보트의 공격!` : `🎮 [${tanks.P2.name}]의 차례입니다!`;
+      }
+
+      // 턴 배너 애니메이션 효과
+      banner.style.opacity = &#x27;1&#x27;;
+      banner.style.transform = &#x27;translate(-50%, 10px)&#x27;;
+      setTimeout(() =&gt; {
+        banner.style.opacity = &#x27;0&#x27;;
+        banner.style.transform = &#x27;translate(-50%, 0)&#x27;;
+      }, 1500);
+
+      playSound(&#x27;turn&#x27;);
+      updateAmmoUI();
+      updateItemUI();
+      updateShotPanel();
+      updateLiveAim();
+      updateMovementUI();
+
+      // 기본탄이 아닌 특수탄을 선택했는데 잔여 수량이 0이면 기본탄으로 자동 전환
+      if (selectedWeapon !== &#x27;normal&#x27; &amp;&amp; ammo[turn][selectedWeapon] &lt;= 0) {
+        selectWeapon(&#x27;normal&#x27;);
+      }
+
+      const windVal = parseFloat(wind);
+      const windDir = windVal &gt;= 0 ? &quot;동풍&quot; : &quot;서풍&quot;;
+      document.getElementById(&#x27;wind-text&#x27;).innerText = `${windDir} ${Math.abs(windVal)}m/s`;
+      document.getElementById(&#x27;wind-icon&#x27;).style.transform = windVal &gt;= 0 ? &#x27;scaleX(1)&#x27; : &#x27;scaleX(-1)&#x27;;
+    }
+
+    function toggleGameMode() {
+      isAiMode = !isAiMode;
+      document.getElementById(&#x27;mode-label&#x27;).innerText = isAiMode ? &quot;VS AI 모드&quot; : &quot;2P 대항전 모드&quot;;
+      tanks.P2.name = isAiMode ? &quot;AI 보트&quot; : &quot;도전자 (P2)&quot;;
+      document.getElementById(&#x27;p2-name-label&#x27;).innerText = tanks.P2.name;
+      resetGame();
+    }
+
+    // ==========================================
+    // 5. PHYSICS &amp; SHOOTING ENGINE
+    // ==========================================
+    function fireCannon(angle, power, guided=false) {
+      if (isFiring || gameFinished || movementState) return;
+      isFiring = true;
+      if(!guided){interceptSelecting=false;interceptor=null;document.body.classList.remove(&#x27;intercept-choosing&#x27;);}
+      updateItemUI();
+      playSound(&#x27;shoot&#x27;);
+
+      // 특수탄 발사 시 수량 차감
+      if (selectedWeapon !== &#x27;normal&#x27;) {
+        ammo[turn][selectedWeapon] = Math.max(0, ammo[turn][selectedWeapon] - 1);
+        updateAmmoUI();
+      }
+
+      const currentTank = tanks[turn];
+      const boosted=boostArmed[turn] &amp;&amp; items[turn].perfect&gt;0;
+      if(boosted){items[turn].perfect--;boostArmed[turn]=false;itemNotice(&#x27;💥 강화탄 발사! 직접·폭발 +50 / 파편 +50%&#x27;);}
+      const spec = {...weaponSpecs[selectedWeapon], damage:weaponSpecs[selectedWeapon].damage+(boosted?50:0), boosted};
+      // 각 플레이어별 마지막 조준 값을 별도로 저장. 바람은 발사 당시 값.
+      const deg = Math.round(Math.atan2(-Math.sin(angle),Math.abs(Math.cos(angle)))*180/Math.PI);
+      const pct = Math.round(power/MAX_POWER*100);
+      activeShot={shooter:turn,weapon:spec.name,angle:deg,power:pct,wind:parseFloat(wind),impact:null,boosted,redLimit:boosted?140:90,paths:[[{x:currentTank.x,y:currentTank.y-12}]]};
+      shotHistory[turn]=activeShot;
+      updateShotPanel();
+
+      projectiles = [{
+        x: currentTank.x,
+        y: currentTank.y - 12,
+        vx: Math.cos(angle) * power,
+        vy: Math.sin(angle) * power,
+        type: selectedWeapon,
+        spec: spec,
+        trail: [], pathId:0, guided:guided, guidedProgress:0
+      }];
+
+      const token=++animationToken;
+      updateItemUI();
+      requestAnimationFrame(()=&gt;updatePhysics(token));
+    }
+
+    function splitTripleShot() {
+      if (projectiles.length !== 1 || projectiles[0].type !== &#x27;triple&#x27;) return;
+      const p = projectiles[0];
+      playSound(&#x27;split&#x27;);
+
+      const spec = p.spec;
+      // 분열 전 궤적을 세 갈래에 이어 붙여 실제 분열 경로를 보존한다.
+      const basePath=activeShot?.paths?.[p.pathId] || [{x:p.x,y:p.y}];
+      if(activeShot)activeShot.paths=[basePath.slice(),basePath.slice(),basePath.slice()];
+      projectiles = [
+        { x: p.x, y: p.y, vx: p.vx, vy: p.vy - 1.5, type: &#x27;triple&#x27;, spec: spec, trail: [], pathId:0 },
+        { x: p.x, y: p.y, vx: p.vx * 1.05, vy: p.vy, type: &#x27;triple&#x27;, spec: spec, trail: [], pathId:1 },
+        { x: p.x, y: p.y, vx: p.vx, vy: p.vy + 1.5, type: &#x27;triple&#x27;, spec: spec, trail: [], pathId:2 }
+      ];
+    }
+
+    function updatePhysics(token) {
+      if (token !== animationToken || gameFinished) return;
+      if(interceptSelecting){requestAnimationFrame(()=&gt;updatePhysics(token));return;}
+      if (projectiles.length===0) {endTurn();return;}
+      const alive=[];
+      projectiles.forEach(p =&gt; {
+        p.vx += parseFloat(wind)*0.006;
+        p.vy += gravity;
+        // 빠른 탄의 지형 관통을 막기 위해 세부 구간에서 충돌 검사.
+        const segments=Math.max(1,Math.ceil(Math.hypot(p.vx,p.vy)/5));
+        let impact=null;
+        for(let j=0;j&lt;segments;j++) {
+          p.x+=p.vx/segments;p.y+=p.vy/segments;
+          if(p.x &lt; -80 || p.x &gt; canvas.width+80 || p.y &gt; canvas.height+80) {impact=&#x27;outside&#x27;;break;}
+          const enemy=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
+          if(Math.hypot(p.x-enemy.x,p.y-(enemy.y-12)) &lt; p.spec.radius+15) {impact=&#x27;enemy&#x27;;break;}
+          if(hitCover(p.x,p.y,p.spec.radius)) {impact=&#x27;cover&#x27;;break;}
+          if(p.x&gt;=0 &amp;&amp; p.x&lt;=canvas.width &amp;&amp; p.y &gt;= getTerrainY(p.x)) {impact=&#x27;ground&#x27;;break;}
+        }
+        appendShotPoint(p);
+        p.trail.push({x:p.x,y:p.y});if(p.trail.length&gt;15)p.trail.shift();
+        if(impact===&#x27;enemy&#x27; || impact===&#x27;ground&#x27; || impact===&#x27;cover&#x27;) {
+          const iy=impact===&#x27;ground&#x27;?getTerrainY(p.x):p.y;
+          recordImpact(p.x,iy,impact===&#x27;cover&#x27;?&#x27;엄폐 바위 명중&#x27;:impact===&#x27;enemy&#x27;?&#x27;상대 명중&#x27;:&#x27;지형 명중&#x27;);
+          triggerExplosion(p.x,iy,p.spec,impact===&#x27;cover&#x27;?hitCover(p.x,p.y,p.spec.radius):null,impact===&#x27;enemy&#x27; ? (turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;) : null);
+        } else if(impact===&#x27;outside&#x27;) recordImpact(p.x,p.y,&#x27;화면 밖&#x27;);
+        else alive.push(p);
+      });
+      projectiles=alive;
+      updateInterceptor();
+      updateItemUI();
+      if (gameFinished) return;
+      if(projectiles.length) requestAnimationFrame(()=&gt;updatePhysics(token));
+      else setTimeout(()=&gt;{if(token===animationToken &amp;&amp; !gameFinished)endTurn();},350);
+    }
+
+    function triggerExplosion(x, y, spec, struckRock=null, directTarget=null) {
+      // 폭발 피해 판정은 파괴 전 바위 위치를 기준으로 계산한다.
+      const coverSnapshot=coverRocks.filter(r=&gt;r.hp&gt;0).map(r=&gt;({owner:r.owner,x:r.x,y:coverCenter(r).y,r:r.r,hp:r.hp}));
+      playSound(spec.name === &#x27;대형바위탄&#x27; ? &#x27;explosion_rock&#x27; : (spec.name === &#x27;레드탄&#x27; ? &#x27;explosion_red&#x27; : &#x27;explosion_normal&#x27;));
+      explosions.push({ x: x, y: y, radius: 4, maxRadius: spec.explosionRadius, alpha: 1, color: spec.color });
+
+      for (let i = 0; i &lt; 20; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 6 + 1;
+        particles.push({
+          x: x, y: y,
+          vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+          alpha: 1, radius: Math.random() * 4 + 2,
+          color: [&#x27;#f97316&#x27;, &#x27;#ef4444&#x27;, &#x27;#eab308&#x27;, &#x27;#78350f&#x27;][Math.floor(Math.random() * 4)]
+        });
+      }
+
+      // 폭발 시 흙과 돌이 날아가는 파편을 생성한다. 피해 한도는 폭발 1회 기준.
+      spawnTerrainDebris(x,y,spec,false);
+      for (let pt of terrainPoints) {
+        const d = Math.abs(pt.x - x);
+        if (d &lt; spec.explosionRadius) {
+          const depth = Math.sqrt(spec.explosionRadius * spec.explosionRadius - d * d) * (spec.terrainDamage / 40);
+          if (!pt.broken) {
+            pt.y += depth;
+            if (pt.y &gt;= pitLimit()) {pt.broken=true;pt.y=canvas.height+110;}
+          }
+        }
+      }
+
+      // 살아 있는 발판 위에서는 지면을 따라 이동한다. 땅이 관통되면 자연 낙하.
+      for(const key of [&#x27;P1&#x27;,&#x27;P2&#x27;]){
+        if(fallingTanks[key])continue;
+        const tank=tanks[key], floor=getTerrainY(tank.x);
+        if(floor&gt;pitLimit()){
+          fallingTanks[key]={vy:0};
+          tank.walkFrame=0;
+          pitWarningUntil=performance.now()+1500;
+        }else tank.y=floor;
+      }
+
+      // 레드탄 직접 명중은 90HP 확정. 분열탄 전체의 데미지 합계도 90HP로 제한한다.
+      if(spec.name===&#x27;레드탄&#x27; &amp;&amp; directTarget) applyRedDamage(directTarget,spec.damage);
+      checkSplashDamage(x, y, spec, coverSnapshot, directTarget);
+
+      // 바위탄은 엄폐물을 빠르게 파괴하지만, 소형탄도 누적 공격으로 제거 가능.
+      for(const rock of coverRocks) {
+        if(rock.hp&lt;=0)continue;
+        const c=coverCenter(rock),d=Math.hypot(x-c.x,y-c.y);
+        if(rock===struckRock || d&lt;spec.explosionRadius+rock.r*.35) {
+          rock.hp=Math.max(0,rock.hp-(rock===struckRock?58:spec.name===&#x27;대형바위탄&#x27;?48:spec.name===&#x27;레드탄&#x27;?25:32));
+          if(rock.hp===0) {spawnTerrainDebris(c.x,c.y,spec,true);for(let i=0;i&lt;15;i++)particles.push({x:c.x,y:c.y,vx:(Math.random()-.5)*9,vy:-Math.random()*7,alpha:1,radius:3+Math.random()*5,color:&#x27;#64748b&#x27;});}
+        }
+      }
+    }
+
+    function applyRedDamage(key,amount) {
+      if(!activeShot)return;
+      activeShot.redDamage=activeShot.redDamage||{P1:0,P2:0};
+      const finalDamage=Math.max(0,Math.min(amount,activeShot.redLimit-activeShot.redDamage[key]));
+      activeShot.redDamage[key]+=finalDamage;
+      applyDamage(key,finalDamage);
+    }
+    function checkSplashDamage(x, y, spec, coverSnapshot=[], directTarget=null) {
+      [&#x27;P1&#x27;, &#x27;P2&#x27;].forEach(key =&gt; {
+        if(spec.name===&#x27;레드탄&#x27; &amp;&amp; key===directTarget)return;
+        const t = tanks[key];
+        const dist = Math.hypot(x - t.x, y - t.y);
+        if (dist &lt; spec.explosionRadius + 24) {
+          const closeness=Math.max(0,1-dist/(spec.explosionRadius+24));
+          let damage = Math.round(spec.damage*(0.22+0.78*Math.pow(closeness,0.55)));
+          // 살아 있는 엄폐 바위가 폭심과 몸 사이에 있으면 폭발 피해 감소.
+          const shielded=coverSnapshot.some(r=&gt; {
+            if(r.owner!==key)return false;
+            const tx=t.x,ty=t.y-12,dx=tx-x,dy=ty-y,L=dx*dx+dy*dy;
+            if(L&lt;1)return false;
+            const a=Math.max(0,Math.min(1,((r.x-x)*dx+(r.y-y)*dy)/L));
+            return a&gt;.12&amp;&amp;a&lt;.95&amp;&amp;Math.hypot(x+a*dx-r.x,y+a*dy-r.y)&lt;r.r*.86;
+          });
+          if(shielded) damage=Math.round(damage*0.38);
+          if (damage &gt; 0) {if(spec.name===&#x27;레드탄&#x27;)applyRedDamage(key,damage);else applyDamage(key,damage);}
+        }
+      });
+    }
+
+    function applyDamage(targetKey, damage) {
+      if(gameFinished || damage&lt;=0)return;
+      tanks[targetKey].hp = Math.max(0, tanks[targetKey].hp - damage);
+      
+      const hpBar = document.getElementById(`${targetKey.toLowerCase()}-hp-bar`);
+      const hpText = document.getElementById(`${targetKey.toLowerCase()}-hp-text`);
+      
+      const percent = (tanks[targetKey].hp / tanks[targetKey].maxHp) * 100;
+      hpBar.style.width = `${percent}%`;
+      hpText.innerText = `${tanks[targetKey].hp} HP`;
+
+      if (tanks[targetKey].hp &lt;= 0) {
+        showGameOver(tanks[targetKey===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;].name);
+      }
+    }
+
+    function endTurn() {
+      if (gameFinished || Object.keys(fallingTanks).length) return;
+      projectiles = [];
+      isFiring = false;
+      activeShot=null;interceptor=null;interceptSelecting=false;document.body.classList.remove(&#x27;intercept-choosing&#x27;);
+      if(extraTurnPending&amp;&amp;extraTurnOwner===turn){
+        extraTurnPending=false;extraTurnOwner=null;
+        wind=(Math.random()*4-2).toFixed(1);
+        syncUIWithTurn();itemNotice(&#x27;⚡ 보너스 턴! 한 번 더 행동하세요&#x27;);
+        if(isAiMode&amp;&amp;turn===&#x27;P2&#x27;)setTimeout(runAiTurn,850);
+        draw();return;
+      }
+      updateItemUI();
+
+      wind = (Math.random() * 4 - 2).toFixed(1);
+      turn = turn === &#x27;P1&#x27; ? &#x27;P2&#x27; : &#x27;P1&#x27;;
+      syncUIWithTurn();
+
+      if (isAiMode &amp;&amp; turn === &#x27;P2&#x27; &amp;&amp; tanks.P2.hp &gt; 0) {
+        setTimeout(runAiTurn, 1000);
+      }
+
+      draw();
+    }
+
+    function runAiTurn() {
+      if (turn !== &#x27;P2&#x27; || !isAiMode || gameFinished || isFiring) return;
+      if(items.P2.double&gt;0&amp;&amp;!extraTurnPending&amp;&amp;Math.random()&lt;.55)useItem(&#x27;double&#x27;,true);
+      if(items.P2.perfect&gt;0&amp;&amp;Math.random()&lt;.5)useItem(&#x27;perfect&#x27;,true);
+
+
+      // AI도 가끔 위험한 엄폐 위치를 벗어나도록 이동 턴을 사용한다.
+      if(Math.random()&lt;0.16) {
+        const current=tanks.P2;
+        const dirs=Math.random()&lt;0.5?[-1,1]:[1,-1];
+        if(dirs.some(dir=&gt;moveCharacter(dir,true)))return;
+      }
+      const p1 = tanks.P1;
+      const p2 = tanks.P2;
+      const dx = p1.x - p2.x;
+      const dy = (p1.y - 12) - (p2.y - 12);
+
+      // AI 무기 선택 (수량이 남았을 때 확률적 사용)
+      let availableWpn = [&#x27;normal&#x27;];
+      if (ammo.P2.triple &gt; 0) availableWpn.push(&#x27;triple&#x27;);
+      if (ammo.P2.rock &gt; 0) availableWpn.push(&#x27;rock&#x27;);
+
+      selectedWeapon = availableWpn[Math.floor(Math.random() * availableWpn.length)];
+
+      // 실제 물리 엔진과 같은 수식으로 유효한 각도/파워 조합을 탐색한다.
+      let best={error:Infinity,angle:Math.PI*1.2,power:17};
+      for(let power=12;power&lt;=22;power+=1)for(let degrees=12;degrees&lt;=82;degrees+=2){
+        const angle=(dx&lt;0?Math.PI:0) + (dx&lt;0?-1:-1)*degrees*Math.PI/180 * (dx&lt;0?-1:1);
+        // 왼쪽을 쏠 때 각도는 -PI+상향각, 오른쪽은 -상향각.
+        const a=dx&lt;0?-Math.PI+degrees*Math.PI/180:-degrees*Math.PI/180;
+        let x=p2.x,y=p2.y-12,vx=Math.cos(a)*power,vy=Math.sin(a)*power;
+        let err=Infinity;
+        for(let t=0;t&lt;180;t++){
+          vx+=parseFloat(wind)*0.006;vy+=gravity;x+=vx;y+=vy;
+          if(Math.abs(x-p1.x)&lt;17)err=Math.min(err,Math.abs(y-(p1.y-12)));
+          if(x&lt;0||x&gt;canvas.width||y&gt;canvas.height|| (x&gt;=0&amp;&amp;x&lt;=canvas.width&amp;&amp;y&gt;=getTerrainY(x)))break;
+        }
+        const score=err+Math.random()*6;
+        if(score&lt;best.error)best={error:score,angle:a,power};
+      }
+      const angle=best.angle+(Math.random()-.5)*0.045;
+      const power=best.power+(Math.random()-.5)*0.55;
+
+      fireCannon(angle, power);
+    }
+
+    function showGameOver(wName) {
+      if(gameFinished)return;
+      gameFinished=true;
+      clearTimeout(itemTimer);clearTimeout(aiItemTimer);fieldItem=null;document.getElementById(&#x27;field-item&#x27;).style.display=&#x27;none&#x27;;updateItemUI();
+      movementState=null;
+      isAiming=false;isFiring=false;projectiles=[];
+      ++animationToken;
+      document.getElementById(&#x27;winner-text&#x27;).innerText = `${wName} 승리!`;
+      document.getElementById(&#x27;winner-subtext&#x27;).innerText = &quot;전략적 특수탄 운용으로 멋진 승리를 차지했습니다.&quot;;
+      document.getElementById(&#x27;modal-gameover&#x27;).classList.remove(&#x27;hidden&#x27;);
+    }
+
+    function animateFalls(dt){
+      if(gameFinished) return;
+      for(const key of Object.keys(fallingTanks)){
+        const fall=fallingTanks[key],t=tanks[key];
+        fall.vy=Math.min(22,fall.vy+0.038*dt);
+        t.y+=fall.vy*dt/16.7;
+        if(t.y &gt; canvas.height+38){
+          const other=key===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;;
+          const winner=tanks[other].name;
+          showGameOver(winner);
+          document.getElementById(&#x27;winner-subtext&#x27;).innerText=`${t.name} 지형 붕괴로 추락!`;
+          break;
+        }
+      }
+    }
+
+    function resetGame() {
+      gameFinished=false;
+      fallingTanks={};pitWarningUntil=0;
+      movementState=null;
+      ++matchToken;++animationToken;
+      clearTimeout(itemTimer);clearTimeout(aiItemTimer);
+      fieldItem=null;document.getElementById(&#x27;field-item&#x27;).style.display=&#x27;none&#x27;;
+      items.P1.double=items.P1.perfect=items.P2.double=items.P2.perfect=0;
+      boostArmed.P1=boostArmed.P2=false;
+      extraTurnOwner=null;extraTurnPending=false;perfectActive=false;guidedPath=null;interceptor=null;interceptSelecting=false;document.body.classList.remove(&#x27;intercept-choosing&#x27;);
+      tanks.P1.hp = 100;
+      tanks.P2.hp = 100;
+      ammo = {
+        P1: { triple: 3, rock: 3 },
+        P2: { triple: 3, rock: 3 }
+      };
+      turn = &#x27;P1&#x27;;
+      isFiring = false;
+      isAiming = false;
+      projectiles = [];
+      debris=[];particles=[];explosions=[];
+      shotHistory.P1=null;shotHistory.P2=null;activeShot=null;
+      selectedWeapon = &#x27;normal&#x27;;
+
+      selectWeapon(&#x27;normal&#x27;);
+
+      document.getElementById(&#x27;p1-hp-bar&#x27;).style.width = &#x27;100%&#x27;;
+      document.getElementById(&#x27;p2-hp-bar&#x27;).style.width = &#x27;100%&#x27;;
+      document.getElementById(&#x27;p1-hp-text&#x27;).innerText = &#x27;100 HP&#x27;;
+      document.getElementById(&#x27;p2-hp-text&#x27;).innerText = &#x27;100 HP&#x27;;
+
+      document.getElementById(&#x27;modal-gameover&#x27;).classList.add(&#x27;hidden&#x27;);
+
+      landscapeSeed=Math.floor(Math.random()*100000);
+      generateTerrain();
+      repositionTanks(true);
+      setupCoverRocks();
+      syncUIWithTurn();
+      updateMovementUI();updateItemUI();scheduleFieldItem();
+      draw();
+    }
+
+    // ==========================================
+    // 6. ANGRY BIRDS RENDERING ENGINE
+    // ==========================================
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bgGrad.addColorStop(0, &#x27;#7dd3fc&#x27;);
+      bgGrad.addColorStop(0.6, &#x27;#bae6fd&#x27;);
+      bgGrad.addColorStop(1, &#x27;#e0f2fe&#x27;);
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      drawScenery();
+      updateAndDrawBgParticles();
+      drawTerrain();
+      drawCoverRocks();
+      drawMountainFlag();
+      drawPreviousTrajectory();
+
+      if (isAiming) drawAimGuide();
+      drawInterceptor();
+
+      drawTank(tanks.P1, &#x27;P1&#x27;);
+      drawTank(tanks.P2, &#x27;P2&#x27;);
+      drawCharacterPowerGauge(&#x27;P1&#x27;);
+      drawCharacterPowerGauge(&#x27;P2&#x27;);
+      drawProjectiles();
+
+      updateAndDrawParticles();
+      updateAndDrawDebris();
+      updateAndDrawExplosions();
+    }
+
+    function noise1(n){let v=Math.sin(n*127.1+landscapeSeed*0.01)*43758.5453;return v-Math.floor(v);}
+    function drawScenery(){
+      const w=canvas.width,h=canvas.height;
+      ctx.save();
+      // 원근감을 주는 태양빛, 대기와 겹겹이 겹친 산 능선
+      const sun=ctx.createRadialGradient(w*.77,h*.20,4,w*.77,h*.20,h*.55);
+      sun.addColorStop(0,&#x27;rgba(255,244,188,.83)&#x27;);sun.addColorStop(.2,&#x27;rgba(255,245,210,.28)&#x27;);sun.addColorStop(1,&#x27;rgba(255,255,255,0)&#x27;);
+      ctx.fillStyle=sun;ctx.fillRect(0,0,w,h);
+      ctx.fillStyle=&#x27;#fff5c6&#x27;;ctx.beginPath();ctx.arc(w*.77,h*.2,26,0,Math.PI*2);ctx.fill();
+      for(let layer=0;layer&lt;4;layer++){
+        const base=h*(.49+layer*.072),amp=h*(.12-layer*.014);
+        ctx.beginPath();ctx.moveTo(0,h);
+        for(let x=0;x&lt;=w+8;x+=8){
+          const y=base+Math.sin(x/(95+layer*23)+layer*2)*amp*.55+Math.cos(x/(41+layer*23)+layer)*amp*.28;
+          ctx.lineTo(x,y);
+        }
+        ctx.lineTo(w,h);ctx.closePath();
+        ctx.fillStyle=[&#x27;#bdd9df&#x27;,&#x27;#9fc7bd&#x27;,&#x27;#7fae99&#x27;,&#x27;#668d78&#x27;][layer];ctx.fill();
+      }
+      // 경계에서 멀리 떨어진 소나무 실루엣
+      for(let i=0;i&lt;20;i++){
+        const x=noise1(i+17)*w,y=h*(.63+noise1(i+36)*.06),size=11+noise1(i+82)*18;
+        ctx.fillStyle=&#x27;rgba(33,91,66,.33)&#x27;;
+        ctx.fillRect(x-1.7,y-size*.6,3.4,size*.8);
+        for(let k=0;k&lt;3;k++){ctx.beginPath();ctx.moveTo(x,y-size*(1.6-k*.28));ctx.lineTo(x-size*(.52-k*.08),y-size*(.4-k*.25));ctx.lineTo(x+size*(.52-k*.08),y-size*(.4-k*.25));ctx.closePath();ctx.fill();}
+      }
+      ctx.restore();
+    }
+    function traceTerrain(){
+      // 빈 땅을 가로질러 선을 잇지 않는다: 온전한 지면 구간마다 독립 폴리곤.
+      const h=pitLimit();
+      ctx.beginPath();
+      let from=-1;
+      function closeSegment(to){
+        if(from&lt;0)return;
+        ctx.lineTo(terrainPoints[to].x,h);
+        ctx.lineTo(terrainPoints[from].x,h);
+        ctx.closePath();from=-1;
+      }
+      for(let i=0;i&lt;terrainPoints.length;i++){
+        const p=terrainPoints[i];
+        if(p.broken){closeSegment(i-1);continue;}
+        if(from&lt;0){from=i;ctx.moveTo(p.x,h);ctx.lineTo(p.x,p.y);}
+        else ctx.lineTo(p.x,p.y);
+      }
+      closeSegment(terrainPoints.length-1);
+    }
+    function drawTerrain(){
+      if(!terrainPoints.length)return;
+      const h=canvas.height,w=canvas.width;
+      const pitTop=pitLimit()-25;
+      ctx.save();
+      // 낭떠러지는 거의 검은 심연처럼 보이도록 더 깊고 어둡게 처리.
+      const abyss=ctx.createLinearGradient(0,pitTop,0,h);
+      abyss.addColorStop(0,&#x27;rgba(18,20,28,.25)&#x27;);
+      abyss.addColorStop(.08,&#x27;rgba(8,10,16,.82)&#x27;);
+      abyss.addColorStop(.55,&#x27;#05070d&#x27;);
+      abyss.addColorStop(1,&#x27;#000000&#x27;);
+      ctx.fillStyle=abyss;ctx.fillRect(0,pitTop,w,h-pitTop);
+      // 사선 패턴과 갈라짐으로 밋밋함을 줄임.
+      ctx.save();
+      ctx.beginPath();ctx.rect(0,pitTop,w,h-pitTop);ctx.clip();
+      for(let i=-h;i&lt;w+h;i+=22){
+        ctx.strokeStyle=i%44===0?&#x27;rgba(121,135,168,.12)&#x27;:&#x27;rgba(56,65,88,.08)&#x27;;
+        ctx.lineWidth=i%44===0?2:1;
+        ctx.beginPath();ctx.moveTo(i,pitTop);ctx.lineTo(i-h*0.55,h);ctx.stroke();
+      }
+      for(let i=0;i&lt;18;i++){
+        const cx=(i+.35+noise1(i+210)*.35)/18*w;
+        const depth=pitTop+18+noise1(i+410)*(h-pitTop-50);
+        const len=40+noise1(i+510)*110;
+        ctx.strokeStyle=&#x27;rgba(0,0,0,.45)&#x27;;ctx.lineWidth=3.6;
+        ctx.beginPath();ctx.moveTo(cx,depth);
+        ctx.lineTo(cx+(noise1(i+610)-.5)*24,depth+len*.35);
+        ctx.lineTo(cx+(noise1(i+710)-.5)*38,Math.min(h,depth+len));
+        ctx.stroke();
+        ctx.strokeStyle=&#x27;rgba(180,190,220,.06)&#x27;;ctx.lineWidth=1.2;
+        ctx.stroke();
+      }
+      for(let i=0;i&lt;32;i++){
+        const glowX=noise1(i+820)*w, glowY=pitTop+10+noise1(i+920)*(h-pitTop-10), r=1.5+noise1(i+1020)*2.6;
+        ctx.fillStyle=i%3===0?&#x27;rgba(255,255,255,.04)&#x27;:&#x27;rgba(116,138,178,.05)&#x27;;
+        ctx.beginPath();ctx.arc(glowX,glowY,r,0,Math.PI*2);ctx.fill();
+      }
+      // 구덩이 윗부분에 진한 그림자를 더해 절벽 느낌 강화.
+      const lip=ctx.createLinearGradient(0,pitTop-18,0,pitTop+32);
+      lip.addColorStop(0,&#x27;rgba(0,0,0,0)&#x27;);
+      lip.addColorStop(.35,&#x27;rgba(0,0,0,.34)&#x27;);
+      lip.addColorStop(1,&#x27;rgba(255,255,255,.04)&#x27;);
+      ctx.fillStyle=lip;ctx.fillRect(0,pitTop-18,w,50);
+      ctx.restore();
+      traceTerrain();
+      const soil=ctx.createLinearGradient(0,h*.2,0,pitLimit());
+      soil.addColorStop(0,&#x27;#8a784e&#x27;);soil.addColorStop(.28,&#x27;#77503b&#x27;);
+      soil.addColorStop(.7,&#x27;#543d34&#x27;);soil.addColorStop(1,&#x27;#302b2f&#x27;);
+      ctx.fillStyle=soil;ctx.fill();ctx.clip();
+      for(let i=0;i&lt;240;i++){
+        const x=noise1(i+300)*w,y=noise1(i+600)*h,rx=5+noise1(i+900)*37,ry=3+noise1(i+1100)*16;
+        ctx.beginPath();ctx.moveTo(x-rx,y);
+        ctx.lineTo(x-rx*.37,y-ry);ctx.lineTo(x+rx*.6,y-ry*.7);ctx.lineTo(x+rx,y+ry*.28);
+        ctx.lineTo(x+rx*.15,y+ry);ctx.lineTo(x-rx*.8,y+ry*.6);ctx.closePath();
+        ctx.fillStyle=i%3===0?&#x27;rgba(229,199,150,.16)&#x27;:i%3===1?&#x27;rgba(25,31,30,.17)&#x27;:&#x27;rgba(163,116,76,.18)&#x27;;ctx.fill();
+        ctx.strokeStyle=&#x27;rgba(34,33,31,.16)&#x27;;ctx.lineWidth=1;ctx.stroke();
+      }
+      ctx.restore();
+      ctx.save();
+      // 지면 선은 구멍을 건너뛰고, 파괴된 양쪽 절벽은 드러난다.
+      ctx.beginPath();let drawing=false;
+      for(const p of terrainPoints){
+        if(p.broken){drawing=false;continue;}
+        if(!drawing){ctx.moveTo(p.x,p.y);drawing=true;}else ctx.lineTo(p.x,p.y);
+      }
+      ctx.strokeStyle=&#x27;#283c29&#x27;;ctx.lineWidth=10;ctx.stroke();
+      ctx.strokeStyle=&#x27;#79a845&#x27;;ctx.lineWidth=6;ctx.stroke();
+      ctx.strokeStyle=&#x27;#b6d768&#x27;;ctx.lineWidth=2.2;ctx.stroke();
+      for(let i=6;i&lt;terrainPoints.length-6;i+=5){
+        const p=terrainPoints[i],n=noise1(i+1400);
+        if(p.broken)continue;
+        if(n&gt;.43){ctx.strokeStyle=n&gt;.78?&#x27;#a3c56e&#x27;:&#x27;#507d3d&#x27;;ctx.lineWidth=1.3;
+          ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-3,p.y-4-n*6);
+          ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+3,p.y-3-n*5);ctx.stroke();}
+      }
+      // 무너진 절벽 벽면에 세로 음영을 넣어 깊이감 강조.
+      for(let i=1;i&lt;terrainPoints.length-1;i++){
+        const p=terrainPoints[i];
+        if(!p.broken)continue;
+        const left=terrainPoints[i-1], right=terrainPoints[i+1];
+        if(left &amp;&amp; !left.broken){
+          ctx.strokeStyle=&#x27;rgba(20,15,14,.45)&#x27;;ctx.lineWidth=6;
+          ctx.beginPath();ctx.moveTo(left.x,left.y);ctx.lineTo(left.x,pitLimit()+10);ctx.stroke();
+        }
+        if(right &amp;&amp; !right.broken){
+          ctx.strokeStyle=&#x27;rgba(255,255,255,.08)&#x27;;ctx.lineWidth=2;
+          ctx.beginPath();ctx.moveTo(right.x,right.y);ctx.lineTo(right.x,pitLimit()+8);ctx.stroke();
+        }
+      }
+      ctx.restore();
+      for(let k=0;k&lt;34;k++){
+        const x=(k+.4+noise1(k+5)*.3)/34*w,top=getTerrainY(x),size=7+noise1(k+98)*15;
+        if(top&lt;pitLimit()-size*.8)drawRock(x,top+size*.25,size,noise1(k+241));
+      }
+      if(Object.keys(fallingTanks).length || performance.now()&lt;pitWarningUntil){
+        ctx.save();ctx.font=&#x27;900 19px Pretendard,sans-serif&#x27;;ctx.textAlign=&#x27;center&#x27;;
+        ctx.strokeStyle=&#x27;#331217&#x27;;ctx.lineWidth=5;ctx.fillStyle=&#x27;#ffe29a&#x27;;
+        ctx.strokeText(&#x27;⚠ 지반 붕괴! 추락 위험&#x27;,w/2,h*.18);ctx.fillText(&#x27;⚠ 지반 붕괴! 추락 위험&#x27;,w/2,h*.18);ctx.restore();
+      }
+    }
+    function drawRock(x,y,r,seed){
+      ctx.save();ctx.translate(x,y);ctx.rotate((seed-.5)*.48);
+      const vertices=[[-.96,.1],[-.76,-.65],[-.24,-1],[.53,-.82],[.98,-.15],[.72,.7],[-.35,.9]];
+      ctx.beginPath();vertices.forEach(([a,b],i)=&gt;i?ctx.lineTo(a*r,b*r):ctx.moveTo(a*r,b*r));ctx.closePath();
+      ctx.fillStyle=&#x27;#766c61&#x27;;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=&#x27;#403b37&#x27;;ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-.76*r,-.65*r);ctx.lineTo(-.24*r,-r);ctx.lineTo(.53*r,-.82*r);ctx.lineTo(.19*r,-.18*r);ctx.lineTo(-.46*r,.13*r);ctx.closePath();ctx.fillStyle=&#x27;#bcb0a0&#x27;;ctx.fill();
+      ctx.beginPath();ctx.moveTo(.53*r,-.82*r);ctx.lineTo(.98*r,-.15*r);ctx.lineTo(.72*r,.7*r);ctx.lineTo(.19*r,-.18*r);ctx.closePath();ctx.fillStyle=&#x27;#514e4b&#x27;;ctx.fill();
+      ctx.beginPath();ctx.moveTo(-.46*r,.13*r);ctx.lineTo(.19*r,-.18*r);ctx.lineTo(.72*r,.7*r);ctx.lineTo(-.35*r,.9*r);ctx.closePath();ctx.fillStyle=&#x27;#82786d&#x27;;ctx.fill();
+      ctx.strokeStyle=&#x27;rgba(42,42,43,.6)&#x27;;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-.2*r,.18*r);ctx.lineTo(.05*r,.43*r);ctx.lineTo(.02*r,.65*r);ctx.stroke();ctx.restore();
+    }
+
+    function drawMountainFlag() {
+      const midIdx = Math.floor(terrainPoints.length / 2);
+      const topPt = terrainPoints[midIdx];
+      if(topPt.broken) return;
+
+      ctx.save();
+      ctx.translate(topPt.x, topPt.y);
+
+      ctx.strokeStyle = &#x27;#475569&#x27;;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -35);
+      ctx.stroke();
+
+      const windVal = parseFloat(wind);
+      const dir = windVal &gt;= 0 ? 1 : -1;
+      const wave = Math.sin(Date.now() * 0.008) * 4;
+
+      ctx.fillStyle = &#x27;#ef4444&#x27;;
+      ctx.beginPath();
+      ctx.moveTo(0, -35);
+      ctx.quadraticCurveTo(dir * 12, -35 + wave, dir * 24, -27);
+      ctx.quadraticCurveTo(dir * 12, -20 - wave, 0, -18);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawCoverRocks() {
+      for(const r of coverRocks) {
+        if(r.hp&lt;=0)continue;
+        const c=coverCenter(r),x=c.x,y=c.y,rad=r.r;
+        ctx.save();ctx.translate(x,y);
+        ctx.fillStyle=&#x27;rgba(15,23,42,.24)&#x27;;ctx.beginPath();ctx.ellipse(2,rad*.55,rad*1.15,rad*.25,0,0,Math.PI*2);ctx.fill();
+        const grad=ctx.createLinearGradient(-rad,-rad,rad,rad);
+        grad.addColorStop(0,&#x27;#e2e8f0&#x27;);grad.addColorStop(.28,&#x27;#9ca3af&#x27;);grad.addColorStop(.7,&#x27;#596578&#x27;);grad.addColorStop(1,&#x27;#303b4a&#x27;);
+        ctx.beginPath();
+        for(let i=0;i&lt;=9;i++) {const a=i*Math.PI*2/9,rr=rad*(.88+.10*Math.sin(i*7+r.seed));const px=Math.cos(a)*rr,py=Math.sin(a)*rr;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}
+        ctx.closePath();ctx.fillStyle=grad;ctx.fill();ctx.strokeStyle=&#x27;#3d4656&#x27;;ctx.lineWidth=2;ctx.stroke();
+        ctx.strokeStyle=&#x27;rgba(20,30,45,.46)&#x27;;ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(-rad*.4,-rad*.55);ctx.lineTo(-rad*.05,-rad*.16);ctx.lineTo(rad*.16,rad*.03);ctx.lineTo(rad*.03,rad*.42);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(rad*.4,-rad*.43);ctx.lineTo(rad*.16,-rad*.19);ctx.lineTo(rad*.43,rad*.1);ctx.stroke();
+        if(r.hp&lt;r.maxHp*.55){ctx.strokeStyle=&#x27;#182230&#x27;;ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(-rad*.1,-rad*.15);ctx.lineTo(-rad*.4,rad*.22);ctx.lineTo(-rad*.25,rad*.55);ctx.stroke();}
+        ctx.fillStyle=&#x27;rgba(255,255,255,.65)&#x27;;ctx.beginPath();ctx.ellipse(-rad*.36,-rad*.5,rad*.28,rad*.12,-.3,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=&#x27;#0f172a99&#x27;;ctx.fillRect(-rad,rad*.94,rad*2,4);
+        ctx.fillStyle=r.owner===&#x27;P1&#x27;?&#x27;#38bdf8&#x27;:&#x27;#fb7185&#x27;;ctx.fillRect(-rad,rad*.94,rad*2*r.hp/r.maxHp,4);
+        ctx.restore();
+      }
+    }
+    function drawAimGuide() {
+      const dx=aimStart.x-aimCurrent.x,dy=aimStart.y-aimCurrent.y;
+      const dist=Math.hypot(dx,dy),power=Math.min(dist/MAX_PULL,1)*MAX_POWER;
+      const angle=Math.atan2(dy,dx);
+      const pulse=(Math.sin(Date.now()*0.013)+1)*0.5;
+      ctx.save();
+      ctx.lineCap=&#x27;round&#x27;;
+      ctx.strokeStyle=&#x27;#4a2f1c&#x27;;ctx.lineWidth=7;
+      ctx.beginPath();ctx.moveTo(aimStart.x-13,aimStart.y-6);
+      ctx.lineTo(aimVisualCurrent.x,aimVisualCurrent.y);
+      ctx.lineTo(aimStart.x+13,aimStart.y-6);ctx.stroke();
+      ctx.shadowColor=&#x27;rgba(251,191,36,.7)&#x27;;ctx.shadowBlur=9+pulse*7;
+      ctx.fillStyle=&#x27;#fbbf24&#x27;;ctx.strokeStyle=&#x27;#fff2b8&#x27;;ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(aimVisualCurrent.x,aimVisualCurrent.y,10.5+pulse,0,Math.PI*2);ctx.fill();ctx.stroke();
+      ctx.shadowBlur=0;
+
+      // 중간 난이도: 완전한 탄도 대신 초반 곡률과 상승 방향만 짧게 미리 본다.
+      // 화면 가까운 목표라도 끝점이 곧바로 적 위치를 가리키지 않게 범위를 제한한다.
+      if (dist&gt;7 &amp;&amp; power&gt;0.5) {
+        const enemy=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
+        const enemyDist=Math.hypot(enemy.x-aimStart.x,enemy.y-12-aimStart.y);
+        const maxPreview=Math.min(145,Math.max(50,enemyDist*.42));
+        const dots=[];
+        let x=aimStart.x,y=aimStart.y;
+        let vx=Math.cos(angle)*power,vy=Math.sin(angle)*power;
+        let length=0;
+        // 실제 물리와 약간 다르게 계산해 근사적인 모양만 알려준다.
+        for(let i=0;i&lt;24;i++) {
+          vx+=parseFloat(wind)*0.004;
+          vy+=gravity*.85;
+          const nx=x+vx,ny=y+vy;
+          length+=Math.hypot(nx-x,ny-y);
+          if(length&gt;maxPreview || nx&lt;5 || nx&gt;canvas.width-5 || ny&lt;5 || ny&gt;canvas.height-5)break;
+          if(hitCover(nx,ny,selectedWeapon===&#x27;rock&#x27;?16:8) || ny&gt;=getTerrainY(nx))break;
+          x=nx;y=ny;
+          if(i%3===0 &amp;&amp; i&gt;0)dots.push({x,y,i});
+        }
+        // 노란색/하늘색 반짝임으로 눈에 띄게 하되, 멀어질수록 희미해진다.
+        dots.forEach((dot,index)=&gt;{
+          const fade=Math.max(.28,1-index/Math.max(6,dots.length)*.78);
+          const radius=3.8-index*.18+pulse*.45;
+          ctx.globalAlpha=fade;
+          ctx.shadowColor=&#x27;#fef08a&#x27;;ctx.shadowBlur=8+pulse*7;
+          ctx.fillStyle=index%2?&#x27;#bae6fd&#x27;:&#x27;#fff7cb&#x27;;
+          ctx.beginPath();ctx.arc(dot.x,dot.y,Math.max(2.1,radius),0,Math.PI*2);ctx.fill();
+        });
+        // 마지막 미리보기 지점의 순간 진행 방향만 작은 발광 화살표로 표시.
+        // 예측 궤적의 길이나 정확도를 늘리지는 않는다.
+        if(dots.length&gt;=2){
+          const tip=dots[dots.length-1], prev=dots[dots.length-2];
+          const dir=Math.atan2(tip.y-prev.y,tip.x-prev.x);
+          const size=8+pulse*1.1;
+          ctx.save();
+          ctx.globalAlpha=.95;
+          ctx.translate(tip.x,tip.y);
+          ctx.rotate(dir);
+          ctx.shadowColor=&#x27;#facc15&#x27;;ctx.shadowBlur=9+pulse*7;
+          ctx.fillStyle=&#x27;#fde047&#x27;;ctx.strokeStyle=&#x27;#713f12&#x27;;ctx.lineWidth=1.3;
+          ctx.beginPath();
+          ctx.moveTo(size,0);
+          ctx.lineTo(-size*.48,-size*.57);
+          ctx.lineTo(-size*.22,0);
+          ctx.lineTo(-size*.48,size*.57);
+          ctx.closePath();ctx.fill();ctx.stroke();
+          ctx.restore();
+        }
+      }
+      ctx.globalAlpha=1;ctx.shadowBlur=0;
+      const powerLabel=dist&lt;MAX_PULL*.33?&#x27;약&#x27;:dist&lt;MAX_PULL*.7?&#x27;중&#x27;:&#x27;강&#x27;;
+      ctx.font=&#x27;900 13px Pretendard,sans-serif&#x27;;ctx.textAlign=&#x27;center&#x27;;
+      ctx.strokeStyle=&#x27;rgba(15,23,42,.65)&#x27;;ctx.lineWidth=5;
+      ctx.fillStyle=&#x27;rgba(255,255,255,.97)&#x27;;
+      ctx.strokeText(&#x27;파워 &#x27;+powerLabel,aimStart.x,aimStart.y-48);
+      ctx.fillText(&#x27;파워 &#x27;+powerLabel,aimStart.x,aimStart.y-48);
+      ctx.restore();
+    }
+
+    function drawTank(tank, key) {
+      ctx.save();
+      ctx.translate(tank.x, tank.y);
+      // 걸을 때 작은 상하 바운스와 두 발의 교차 보행 모션.
+      if(tank.walkFrame){
+        const gait=Math.sin(tank.walkFrame*0.028);
+        ctx.translate(0,-Math.abs(gait)*3);
+        ctx.strokeStyle=&#x27;#334155&#x27;;ctx.lineWidth=4;ctx.lineCap=&#x27;round&#x27;;
+        ctx.beginPath();ctx.moveTo(-6,-2);ctx.lineTo(-7+gait*7,4);ctx.moveTo(6,-2);ctx.lineTo(7-gait*7,4);ctx.stroke();
+      }
+      ctx.fillStyle = tank.color;
+      ctx.beginPath();
+      ctx.arc(0, -12, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = &#x27;#ffffff&#x27;;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = &#x27;#ffffff&#x27;;
+      ctx.beginPath();
+      ctx.arc(key === &#x27;P1&#x27; ? 4 : -4, -16, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = &#x27;#0f172a&#x27;;
+      ctx.beginPath();
+      ctx.arc(key === &#x27;P1&#x27; ? 6 : -6, -16, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // 조준 중인 캐릭터는 눈썹을 찡그리고 입을 벌리는 집중 표정.
+      if(turn===key &amp;&amp; isAiming){
+        ctx.strokeStyle=&#x27;#172033&#x27;;ctx.lineWidth=2.5;ctx.lineCap=&#x27;round&#x27;;
+        ctx.beginPath();ctx.moveTo(key===&#x27;P1&#x27;?-6:1,-25);ctx.lineTo(key===&#x27;P1&#x27;?6:13,-29);ctx.stroke();
+        ctx.fillStyle=&#x27;#521c28&#x27;;ctx.beginPath();ctx.ellipse(key===&#x27;P1&#x27;?2:-2,-6,4.7,6,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=&#x27;#fff&#x27;;ctx.beginPath();ctx.ellipse(key===&#x27;P1&#x27;?2:-2,-4.7,2,1,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=&#x27;#fff&#x27;;ctx.beginPath();ctx.arc(key===&#x27;P1&#x27;?5:-5,-17,1.3,0,Math.PI*2);ctx.fill();
+      }else{
+        ctx.strokeStyle=&#x27;#253044&#x27;;ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(0,-7,4,.15,Math.PI-.15);ctx.stroke();
+      }
+
+      // 자기 턴일 때 캐릭터 화려하게 깜빡이는 효과 (Glow)
+      if (turn === key &amp;&amp; !isFiring) {
+        const glowAlpha = (Math.sin(Date.now() * 0.012) + 1) * 0.5;
+        ctx.strokeStyle = `rgba(245, 158, 11, ${0.4 + glowAlpha * 0.6})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, -12, 22 + glowAlpha * 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    // 캐릭터별 직전 힘 게이지: 화면 좌우 경계를 넘지 않고 엄폐/지형을 가리지 않도록 작게 배치.
+    // 조준 중에는 현재 힘을 별도 밝은 막대로 표시해 직전 값과 즉시 비교한다.
+    function drawCharacterPowerGauge(key) {
+      const shot=shotHistory[key];
+      if (!shot || gameFinished || fallingTanks[key]) return;
+      const tank=tanks[key];
+      const w=130, h=47;
+      const gx=Math.max(5,Math.min(canvas.width-w-5,tank.x-w/2));
+      let gy=tank.y-95;
+      if (gy&lt;8) gy=tank.y+19;
+      if (gy+h&gt;canvas.height-4) gy=Math.max(8,tank.y-h-29);
+      const prior=Math.max(0,Math.min(100,shot.power||0));
+      const aiming=key===turn&amp;&amp;isAiming;
+      const dx=aimStart.x-aimCurrent.x,dy=aimStart.y-aimCurrent.y;
+      const current=aiming?Math.round(Math.min(Math.hypot(dx,dy)/MAX_PULL,1)*100):null;
+      ctx.save();
+      ctx.textAlign=&#x27;left&#x27;;ctx.textBaseline=&#x27;middle&#x27;;
+      ctx.font=&#x27;900 14px Pretendard,sans-serif&#x27;;
+      ctx.lineWidth=3.7;ctx.strokeStyle=&#x27;rgba(5,15,28,.8)&#x27;;
+      ctx.fillStyle=&#x27;#ffffff&#x27;;
+      const label=`직전 힘 ${prior}%`;
+      ctx.strokeText(label,gx+2,gy+9);ctx.fillText(label,gx+2,gy+9);
+      ctx.fillStyle=&#x27;rgba(9,23,40,.65)&#x27;;ctx.fillRect(gx+2,gy+21,w-4,12);
+      ctx.fillStyle=key===&#x27;P1&#x27;?&#x27;#38bdf8&#x27;:&#x27;#fb7185&#x27;;
+      ctx.fillRect(gx+2,gy+21,(w-4)*prior/100,12);
+      ctx.strokeStyle=&#x27;rgba(255,255,255,.85)&#x27;;ctx.lineWidth=1;ctx.strokeRect(gx+2.5,gy+21.5,w-5,11);
+      if (aiming) {
+        // 바로 아래에 현재 파워를 덧그려, 이전과 현재의 차이가 한눈에 보인다.
+        ctx.fillStyle=&#x27;#172334&#x27;;ctx.fillRect(gx+2,gy+36,w-4,8);
+        ctx.fillStyle=&#x27;#facc15&#x27;;ctx.fillRect(gx+2,gy+36,(w-4)*current/100,8);
+        ctx.strokeStyle=&#x27;rgba(255,255,255,.8)&#x27;;ctx.lineWidth=.8;ctx.strokeRect(gx+2.5,gy+36.5,w-5,7);
+      }
+      ctx.restore();
+    }
+
+    function drawProjectiles() {
+      projectiles.forEach(p =&gt; {
+        ctx.beginPath();
+        p.trail.forEach((pt, i) =&gt; {
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.strokeStyle = p.spec.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.spec.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.spec.color;
+        ctx.fill();
+        if(p.type===&#x27;rock&#x27;)drawRock(p.x,p.y,p.spec.radius,0.55);
+        ctx.strokeStyle = &#x27;#ffffff&#x27;;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
+    function updateAndDrawBgParticles() {
+      const windSpeed = parseFloat(wind);
+
+      bgParticles.forEach(p =&gt; {
+        p.x += windSpeed * p.speed + (p.type === &#x27;leaf&#x27; ? 0.5 : 0.2);
+        p.y += Math.sin(Date.now() * 0.002 + p.x) * 0.3;
+
+        if (p.x &lt; -20) p.x = canvas.width + 20;
+        if (p.x &gt; canvas.width + 20) p.x = -20;
+
+        ctx.fillStyle = p.type === &#x27;cloud&#x27; ? &#x27;rgba(255, 255, 255, 0.5)&#x27; : &#x27;rgba(132, 204, 22, 0.6)&#x27;;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function spawnTerrainDebris(x,y,spec,fromCover){
+      const n=fromCover?13:(spec.name===&#x27;대형바위탄&#x27;?25:spec.name===&#x27;레드탄&#x27;?7:20);
+      const explosionId=Symbol(&#x27;debrisExplosion&#x27;);
+      const isRed=spec.name===&#x27;레드탄&#x27;;
+      const shotRef=activeShot;
+      const budget={P1:0,P2:0,limit:Math.round((isRed?2:(spec.name===&#x27;대형바위탄&#x27;?18:12))*(spec.boosted?1.5:1))};
+      for(let i=0;i&lt;n;i++){
+        const a=(Math.PI*1.05)+(Math.random()*Math.PI*.9);
+        const speed=(fromCover?3.4:2.6)+Math.random()*(fromCover?6:7);
+        const size=2.5+Math.random()*(fromCover?5:4.6);
+        debris.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed-1.4,
+          radius:size,angle:Math.random()*6.28,spin:(Math.random()-.5)*.28,
+          tint:fromCover?&#x27;rock&#x27;:Math.random()&lt;.52?&#x27;soil&#x27;:&#x27;rock&#x27;,
+          life:0,maxLife:105+Math.random()*50,impacted:false,
+          budget,isRed,shotRef,damage:Math.max(2,Math.round((size*.72+Math.random()*2)*(spec.boosted?1.5:1))),
+          id:explosionId});
+      }
+      if(debris.length&gt;280)debris.splice(0,debris.length-280);
+    }
+    function updateAndDrawDebris(){
+      for(let i=debris.length-1;i&gt;=0;i--){
+        const d=debris[i];
+        d.life++;
+        d.vy+=gravity*.73;
+        d.vx*=.996;
+        const steps=Math.max(1,Math.ceil(Math.hypot(d.vx,d.vy)/5));
+        let groundHit=false;
+        for(let j=0;j&lt;steps;j++){
+          d.x+=d.vx/steps;d.y+=d.vy/steps;
+          // 캐릭터와 충돌했을 때만 피해. 한 폭발의 파편 피해량은 제한한다.
+          if(!d.impacted&amp;&amp;!gameFinished){
+            for(const k of [&#x27;P1&#x27;,&#x27;P2&#x27;]){
+              const t=tanks[k];
+              if(t.hp&lt;=0)continue;
+              if(Math.hypot(d.x-t.x,d.y-(t.y-12))&lt;d.radius+12){
+                const allowed=Math.max(0,d.budget.limit-d.budget[k]);
+                const hit=Math.min(d.damage,allowed);
+                if(hit&gt;0){
+                  d.budget[k]+=hit;
+                  if(d.isRed){
+                    // 마지막 발사에 속한 파편만 그 발사의 레드탄 90 HP 제한에 합산.
+                    if(d.shotRef){
+                      d.shotRef.redDamage=d.shotRef.redDamage||{P1:0,P2:0};
+                      const actual=Math.max(0,Math.min(hit,d.shotRef.redLimit-d.shotRef.redDamage[k]));
+                      d.shotRef.redDamage[k]+=actual;
+                      applyDamage(k,actual);
+                    }
+                  } else applyDamage(k,hit);
+                  particles.push({x:d.x,y:d.y,vx:0,vy:-1.4,alpha:1,radius:3,color:&#x27;#fff2b3&#x27;});
+                }
+                d.impacted=true;
+                break;
+              }
+            }
+          }
+          if(d.impacted||d.x&lt;0||d.x&gt;=canvas.width||d.y&gt;canvas.height+20){groundHit=true;break;}
+          if(d.y&gt;=getTerrainY(d.x)){groundHit=true;break;}
+        }
+        if(groundHit||d.life&gt;d.maxLife){debris.splice(i,1);continue;}
+        d.angle+=d.spin;
+        ctx.save();ctx.translate(d.x,d.y);ctx.rotate(d.angle);
+        const r=d.radius;
+        ctx.fillStyle=d.tint===&#x27;soil&#x27;?&#x27;#97623c&#x27;:&#x27;#677785&#x27;;
+        ctx.strokeStyle=d.tint===&#x27;soil&#x27;?&#x27;#583922&#x27;:&#x27;#334155&#x27;;ctx.lineWidth=.8;
+        ctx.beginPath();ctx.moveTo(-r,-r*.6);ctx.lineTo(r*.25,-r);ctx.lineTo(r,r*.1);
+        ctx.lineTo(r*.45,r*.85);ctx.lineTo(-r*.8,r*.56);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.beginPath();ctx.moveTo(-r*.65,-r*.35);ctx.lineTo(r*.15,-r*.65);ctx.lineTo(r*.35,-r*.15);
+        ctx.strokeStyle=&#x27;rgba(255,255,255,.45)&#x27;;ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function updateAndDrawParticles() {
+      for (let i = particles.length - 1; i &gt;= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.03;
+
+        if (p.alpha &lt;= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.alpha;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function updateAndDrawExplosions() {
+      for (let i = explosions.length - 1; i &gt;= 0; i--) {
+        const exp = explosions[i];
+        exp.radius += 3;
+        exp.alpha -= 0.05;
+
+        if (exp.alpha &lt;= 0) {
+          explosions.splice(i, 1);
+          continue;
+        }
+
+        ctx.beginPath();
+        ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
+        ctx.fillStyle = exp.color;
+        ctx.globalAlpha = exp.alpha * 0.4;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    let lastFrameTime=0;
+    function gameLoop(now=0) {
+      const dt=lastFrameTime?Math.min(50,now-lastFrameTime):16.7;
+      lastFrameTime=now;
+      animateMovement(dt);
+      animateFalls(dt);
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener(&#x27;resize&#x27;, resizeCanvas);
+    window.addEventListener(&#x27;load&#x27;, () =&gt; {
+      resizeCanvas();
+      setupTouchEvents();
+      syncUIWithTurn();
+      scheduleFieldItem();
+      gameLoop();
+    });
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;"></iframe>
       </section>
     </section>
 
@@ -2246,6 +4433,9 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
 
       const activeView = document.getElementById(`view-${tab}`);
       if (activeView) activeView.classList.remove('hidden');
+      if (tab === 'gamecenter' && activeGameCenterTab === 'fortress') {
+        requestAnimationFrame(() => { resizeFortressFrame(); setTimeout(resizeFortressFrame, 180); });
+      }
 
       const activeBtn = document.getElementById(`tab-btn-${tab}`);
       if (activeBtn) {
@@ -2695,15 +4885,32 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       setTimeout(memoryWatchChallenges,1800);
     });
 
+    let activeGameCenterTab = 'clickrace';
+    function resizeFortressFrame() {
+      const frame = document.getElementById('fortress-game-frame');
+      if (!frame) return;
+      try { frame.contentWindow?.dispatchEvent(new Event('resize')); } catch (err) { console.warn('포트리스 크기 동기화 실패',err); }
+    }
+    function reloadFortressGame() {
+      const frame = document.getElementById('fortress-game-frame');
+      if (frame) frame.contentWindow?.location.reload();
+    }
     function switchGameCenter(game) {
-      ['clickrace', 'reaction', 'memory'].forEach(g => {
+      activeGameCenterTab = game;
+      ['clickrace', 'reaction', 'memory', 'fortress'].forEach(g => {
         const view = document.getElementById(`game-view-${g}`);
         if (view) view.classList.toggle('hidden', g !== game);
         const btn = document.getElementById(`game-sub-btn-${g}`);
         if (!btn) return;
-        if (g === game) btn.className = g === 'clickrace' ? 'flex-1 min-w-[150px] bg-amber-500 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition' : g === 'memory' ? 'flex-1 min-w-[150px] bg-violet-600 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition' : 'flex-1 min-w-[150px] bg-cyan-600 text-white font-extrabold px-4 py-3 rounded-xl text-sm transition';
-        else btn.className = 'flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition';
+        const common = 'flex-1 min-w-[150px] text-white font-extrabold px-4 py-3 rounded-xl text-sm transition';
+        if (g === game) {
+          const activeColors = {clickrace:'bg-amber-500',memory:'bg-violet-600',reaction:'bg-cyan-600',fortress:'bg-emerald-600'};
+          btn.className = common + ' ' + activeColors[g];
+        } else btn.className = 'flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition';
       });
+      if (game === 'fortress') {
+        requestAnimationFrame(() => { resizeFortressFrame(); setTimeout(resizeFortressFrame, 180); });
+      }
     }
 
     function lockTeacherMode() {
