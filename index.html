@@ -1292,7 +1292,32 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     #inventory-panel button {border:1px solid #fde68a;border-radius:12px;background:#334155;color:#fff;padding:6px 10px;font-size:12px;font-weight:900;cursor:pointer}
     #inventory-panel button:disabled {opacity:.4;cursor:default}
     #aim-warning {color:#fef08a;font-weight:900;font-size:13px;min-width:0;text-align:center;display:none}
-    #aim-warning.show {display:inline}
+    #aim-warning.show {display:flex}
+    /* Large warning over the field; readable from the classroom back row. */
+    #game-container #aim-warning {
+      position:absolute;z-index:38;left:50%;top:28%;transform:translateX(-50%);
+      display:none;flex-direction:column;align-items:center;gap:4px;
+      width:max-content;max-width:min(94%,650px);padding:15px 20px;
+      background:rgba(100,13,25,.91);border:3px solid #fde047;
+      border-radius:18px;color:#fff;font-size:clamp(19px,3.5vw,34px);
+      font-weight:1000;line-height:1.2;text-align:center;pointer-events:none;
+      text-shadow:0 2px 4px #450a0a;box-shadow:0 0 20px #ef4444aa,0 7px 24px #0009;
+      animation:fortressWarningPulse .75s ease-in-out infinite alternate;
+    }
+    #game-container #aim-warning.show{display:flex}
+    #game-container #aim-warning span{font-size:clamp(12px,1.8vw,17px);color:#fef08a}
+    @keyframes fortressWarningPulse{from{box-shadow:0 0 6px #ef444477;transform:translateX(-50%) scale(1)}to{box-shadow:0 0 25px #ef4444dd;transform:translateX(-50%) scale(1.045)}}
+    #fortress-turn-announcement {
+      position:absolute;z-index:35;top:34%;left:50%;transform:translate(-50%,-15%) scale(.95);
+      width:max-content;max-width:92%;padding:16px 26px;pointer-events:none;
+      border-radius:20px;background:rgba(10,35,60,.92);
+      color:#fff;font-size:clamp(22px,3.8vw,39px);font-weight:1000;text-align:center;
+      border:3px solid #facc15;text-shadow:0 2px 5px #020617;
+      box-shadow:0 0 25px rgba(250,204,21,.4),0 8px 25px #0008;
+      opacity:0;transition:opacity .15s,transform .2s;
+    }
+    #fortress-turn-announcement.visible {opacity:1;transform:translate(-50%,0) scale(1)}
+    #fortress-turn-announcement.opponent {background:rgba(30,41,59,.88);border-color:#94a3b8;font-size:clamp(18px,2.5vw,25px)}
     #item-toast {position:absolute;top:23%;left:50%;transform:translateX(-50%);z-index:29;pointer-events:none;font-size:17px;font-weight:900;color:white;text-shadow:0 2px 6px #020617;opacity:0;transition:opacity .2s;white-space:nowrap}
     @media(max-width:650px){#field-item .item-symbol{font-size:35px} #field-item button{padding:5px 8px} #inventory-panel button{font-size:11px;padding:5px 7px}}
 
@@ -1464,11 +1489,11 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
   &lt;div id=&quot;shot-panel&quot; aria-live=&quot;polite&quot;&gt;
     &lt;div id=&quot;shot-history&quot;&gt;직전 기록 없음&lt;/div&gt;
     &lt;div id=&quot;shot-live&quot;&gt;이번: 캐릭터를 당겨 조준&lt;/div&gt;
-    &lt;div id=&quot;aim-warning&quot; role=&quot;status&quot;&gt;⚠ 너무 강한 발사! 화면 밖으로 나갈 수 있어요&lt;/div&gt;
+
     &lt;div id=&quot;inventory-panel&quot;&gt;&lt;button id=&quot;item-double&quot; onclick=&quot;useItem(&#x27;double&#x27;)&quot; disabled&gt;⚡ 연속 턴 0&lt;/button&gt;&lt;button id=&quot;item-perfect&quot; onclick=&quot;useItem(&#x27;perfect&#x27;)&quot; disabled&gt;💥 피해 +50 0&lt;/button&gt;&lt;/div&gt;
     &lt;button id=&quot;trajectory-toggle&quot; type=&quot;button&quot; aria-pressed=&quot;true&quot; onclick=&quot;togglePreviousTrajectory()&quot; title=&quot;지난 발사의 실제 궤적 표시 켜기/끄기&quot;&gt;↗ 이전 탄도 ON&lt;/button&gt;
   &lt;/div&gt;
-
+  &lt;div id=&quot;aim-warning&quot; role=&quot;alert&quot; aria-live=&quot;assertive&quot;&gt;⚠ 화면 밖으로 이탈 위험!&lt;span&gt;힘이나 각도를 낮춰 주세요&lt;/span&gt;&lt;/div&gt;
 
     &lt;div id=&quot;field-item&quot; aria-live=&quot;polite&quot;&gt;&lt;span id=&quot;field-item-symbol&quot; class=&quot;item-symbol&quot;&gt;⚡&lt;/span&gt;&lt;span id=&quot;field-item-name&quot; class=&quot;item-name&quot;&gt;연속 턴&lt;/span&gt;&lt;div class=&quot;claim-row&quot;&gt;&lt;button onclick=&quot;claimItem(&#x27;P1&#x27;)&quot;&gt;P1 획득&lt;/button&gt;&lt;button id=&quot;claim-p2&quot; class=&quot;p2&quot; onclick=&quot;claimItem(&#x27;P2&#x27;)&quot;&gt;P2 획득&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;
     &lt;div id=&quot;item-toast&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;
@@ -1480,6 +1505,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       🎮 P1 턴 시작!
     &lt;/div&gt;
 
+    &lt;div id=&quot;fortress-turn-announcement&quot; role=&quot;status&quot; aria-live=&quot;polite&quot; aria-atomic=&quot;true&quot;&gt;&lt;/div&gt;
     &lt;!-- 체력바 (상단 좌/우) --&gt;
     &lt;div id=&quot;health-hud&quot; class=&quot;absolute top-3 left-4 right-4 flex justify-between pointer-events-none z-10 max-w-5xl mx-auto&quot;&gt;
       &lt;!-- P1 체력 --&gt;
@@ -1563,7 +1589,50 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     // 1. GAME STATE &amp; BALANCING SCHEMA
     // ==========================================
     const canvas = document.getElementById(&#x27;gameCanvas&#x27;);
-    const ctx = canvas.getContext(&#x27;2d&#x27;);
+    let ctx = canvas.getContext(&#x27;2d&#x27;);
+    // Static backdrops are cached: regenerate only after resizing, match reset or terrain damage.
+    const fortressSceneryCache=document.createElement(&#x27;canvas&#x27;);
+    const fortressTerrainCache=document.createElement(&#x27;canvas&#x27;);
+    let fortressSceneryDirty=true, fortressTerrainDirty=true;
+    function invalidateFortressScene(){fortressSceneryDirty=true;fortressTerrainDirty=true;}
+    function invalidateFortressTerrain(){fortressTerrainDirty=true;}
+    function drawCachedStaticLayer(offscreen,fn){
+      if(offscreen.width!==canvas.width||offscreen.height!==canvas.height){
+        offscreen.width=canvas.width;offscreen.height=canvas.height;
+      }
+      const oldCtx=ctx;
+      const cacheCtx=offscreen.getContext(&#x27;2d&#x27;);
+      cacheCtx.clearRect(0,0,offscreen.width,offscreen.height);
+      ctx=cacheCtx;
+      try{fn();}finally{ctx=oldCtx;}
+    }
+    function paintCachedWorld(){
+      if(fortressSceneryCache.width!==canvas.width||fortressSceneryCache.height!==canvas.height)fortressSceneryDirty=true;
+      if(fortressTerrainCache.width!==canvas.width||fortressTerrainCache.height!==canvas.height)fortressTerrainDirty=true;
+      if(fortressSceneryDirty){
+        drawCachedStaticLayer(fortressSceneryCache,()=&gt;{
+          const bg=ctx.createLinearGradient(0,0,0,canvas.height);
+          bg.addColorStop(0,&#x27;#7dd3fc&#x27;);bg.addColorStop(.6,&#x27;#bae6fd&#x27;);bg.addColorStop(1,&#x27;#e0f2fe&#x27;);
+          ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);
+          drawScenery();
+        });
+        fortressSceneryDirty=false;
+      }
+      if(fortressTerrainDirty){
+        drawCachedStaticLayer(fortressTerrainCache,drawTerrain);
+        fortressTerrainDirty=false;
+      }
+      ctx.drawImage(fortressSceneryCache,0,0);
+      updateAndDrawBgParticles();
+      ctx.drawImage(fortressTerrainCache,0,0);
+    }
+    function drawPitWarning(){
+      if(!(Object.keys(fallingTanks).length||performance.now()&lt;pitWarningUntil))return;
+      ctx.save();ctx.font=&#x27;900 19px Pretendard,sans-serif&#x27;;ctx.textAlign=&#x27;center&#x27;;
+      ctx.strokeStyle=&#x27;#331217&#x27;;ctx.lineWidth=5;ctx.fillStyle=&#x27;#ffe29a&#x27;;
+      ctx.strokeText(&#x27;⚠ 지반 붕괴! 추락 위험&#x27;,canvas.width/2,canvas.height*.18);
+      ctx.fillText(&#x27;⚠ 지반 붕괴! 추락 위험&#x27;,canvas.width/2,canvas.height*.18);ctx.restore();
+    }
 
     let isAiMode = true;
     let turn = &#x27;P1&#x27;;
@@ -1588,7 +1657,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
 
     const weaponSpecs = {
       normal: { name: &#x27;기본탄&#x27;, radius: 10, damage: 48, explosionRadius: 76, terrainDamage: 36, color: &#x27;#f59e0b&#x27; },
-      triple: { name: &#x27;레드탄&#x27;, radius: 8, damage: 90, explosionRadius: 66, terrainDamage: 5, color: &#x27;#ff1744&#x27; },
+      triple: { name: &#x27;레드탄&#x27;, radius: 6, damage: 90, explosionRadius: 22, terrainDamage: 5, color: &#x27;#ff1744&#x27; },
       rock: { name: &#x27;대형바위탄&#x27;, radius: 16, damage: 70, explosionRadius: 115, terrainDamage: 30, color: &#x27;#475569&#x27; }
     };
 
@@ -1775,7 +1844,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       // Never initialize from hidden/zero-size geometry or artificial fallback values.
       if(newWidth &lt; 280 || newHeight &lt; 220)return false;
       if(onlineRole){
-        if(canvas.width!==960||canvas.height!==600){canvas.width=960;canvas.height=600;}
+        if(canvas.width!==960||canvas.height!==600){canvas.width=960;canvas.height=600;invalidateFortressScene();}
         draw();return true;
       }
       // Canvas width/height reassignment clears the frame and rebuilds terrain.
@@ -1783,6 +1852,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       if(newWidth===fortressLastCanvasWidth &amp;&amp; newHeight===fortressLastCanvasHeight)return true;
       fortressLastCanvasWidth=newWidth;fortressLastCanvasHeight=newHeight;
       canvas.width=newWidth;canvas.height=newHeight;
+      invalidateFortressScene();
       if(fieldItem){document.getElementById(&#x27;field-item&#x27;).style.left=(canvas.width*.5)+&#x27;px&#x27;;document.getElementById(&#x27;field-item&#x27;).style.top=(canvas.height*.38)+&#x27;px&#x27;;}
       generateTerrain();
       initBgParticles();
@@ -1794,6 +1864,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
 
     function generateTerrain() {
       terrainPoints = [];
+      invalidateFortressTerrain();
       const w = canvas.width;
       const h = canvas.height;
       const pitTop = pitLimit() - 36;
@@ -2381,6 +2452,23 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       updateLiveAim();
     }
 
+    let fortressLastNoticeKey=&#x27;&#x27;,fortressTurnNoticeTimer=null;
+    function showFortressTurnNotice(){
+      const mine=onlineRole ? onlineReady&amp;&amp;onlineRole===turn : (isAiMode?turn===&#x27;P1&#x27;:true);
+      if(onlineRole &amp;&amp; !onlineReady)return;
+      const key=(onlineRole||&#x27;solo&#x27;)+&#x27;:&#x27;+turn+&#x27;:&#x27;+(onlineRole?onlineReady:&#x27;ai&#x27;+isAiMode);
+      if(key===fortressLastNoticeKey)return;
+      fortressLastNoticeKey=key;
+      const el=document.getElementById(&#x27;fortress-turn-announcement&#x27;);
+      if(!el)return;
+      el.textContent=mine ? &#x27;🎯 &#x27;+tanks[turn].name+&#x27; 공격 차례!&#x27; : (isAiMode?&#x27;🤖 AI 공격 중&#x27;:&#x27;⏳ &#x27;+tanks[turn].name+&#x27; 차례&#x27;);
+      el.classList.toggle(&#x27;opponent&#x27;,!mine);
+      el.classList.remove(&#x27;visible&#x27;);
+      void el.offsetWidth;
+      el.classList.add(&#x27;visible&#x27;);
+      clearTimeout(fortressTurnNoticeTimer);
+      fortressTurnNoticeTimer=setTimeout(()=&gt;el.classList.remove(&#x27;visible&#x27;),mine?1800:1100);
+    }
     function syncUIWithTurn() {
       const turnLabel = document.getElementById(&#x27;turn-display&#x27;);
       const banner = document.getElementById(&#x27;turn-banner&#x27;);
@@ -2404,6 +2492,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       }, 1500);
 
       playSound(&#x27;turn&#x27;);
+      showFortressTurnNotice();
       updateAmmoUI();
       updateItemUI();
       updateShotPanel();
@@ -2502,7 +2591,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
           p.x+=p.vx/segments;p.y+=p.vy/segments;
           if(p.x &lt; -80 || p.x &gt; canvas.width+80 || p.y &gt; canvas.height+80) {impact=&#x27;outside&#x27;;break;}
           const enemy=tanks[turn===&#x27;P1&#x27;?&#x27;P2&#x27;:&#x27;P1&#x27;];
-          if(Math.hypot(p.x-enemy.x,p.y-(enemy.y-12)) &lt; p.spec.radius+15) {impact=&#x27;enemy&#x27;;break;}
+          if(Math.hypot(p.x-enemy.x,p.y-(enemy.y-12)) &lt; p.spec.radius+(p.type===&#x27;triple&#x27;?12:15)) {impact=&#x27;enemy&#x27;;break;}
           if(hitCover(p.x,p.y,p.spec.radius)) {impact=&#x27;cover&#x27;;break;}
           if(p.x&gt;=0 &amp;&amp; p.x&lt;=canvas.width &amp;&amp; p.y &gt;= getTerrainY(p.x)) {impact=&#x27;ground&#x27;;break;}
         }
@@ -2553,6 +2642,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         }
       }
 
+      invalidateFortressTerrain();
       // 살아 있는 발판 위에서는 지면을 따라 이동한다. 땅이 관통되면 자연 낙하.
       for(const key of [&#x27;P1&#x27;,&#x27;P2&#x27;]){
         if(fallingTanks[key])continue;
@@ -2591,9 +2681,13 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         if(spec.name===&#x27;레드탄&#x27; &amp;&amp; key===directTarget)return;
         const t = tanks[key];
         const dist = Math.hypot(x - t.x, y - t.y);
-        if (dist &lt; spec.explosionRadius + 24) {
-          const closeness=Math.max(0,1-dist/(spec.explosionRadius+24));
-          let damage = Math.round(spec.damage*(0.22+0.78*Math.pow(closeness,0.55)));
+        // Red bullets reward accurate direct hits, not merely landing nearby.
+        const splashRange=spec.name===&#x27;레드탄&#x27;?20:spec.explosionRadius+24;
+        if (dist &lt; splashRange) {
+          const closeness=Math.max(0,1-dist/splashRange);
+          let damage = spec.name===&#x27;레드탄&#x27;
+            ? Math.round(Math.min(15,spec.damage*.12)*(closeness*closeness))
+            : Math.round(spec.damage*(0.22+0.78*Math.pow(closeness,0.55)));
           // 살아 있는 엄폐 바위가 폭심과 몸 사이에 있으면 폭발 피해 감소.
           const shielded=coverSnapshot.some(r=&gt; {
             if(r.owner!==key)return false;
@@ -2740,6 +2834,8 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         P2: { triple: 3, rock: 3 }
       };
       turn = &#x27;P1&#x27;;
+      fortressLastNoticeKey=&#x27;&#x27;;
+      if(!onlineRole){tanks.P1.name=fortressSoloClassName;document.getElementById(&#x27;game-class-title&#x27;).textContent=fortressSoloClassName;document.getElementById(&#x27;p1-name-label&#x27;).textContent=fortressSoloClassName;}
       isFiring = false;
       isAiming = false;
       projectiles = [];
@@ -2757,6 +2853,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       document.getElementById(&#x27;modal-gameover&#x27;).classList.add(&#x27;hidden&#x27;);
 
       landscapeSeed=Math.floor(Math.random()*100000);
+      invalidateFortressScene();
       generateTerrain();
       repositionTanks(true);
       setupCoverRocks();
@@ -2771,16 +2868,8 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      bgGrad.addColorStop(0, &#x27;#7dd3fc&#x27;);
-      bgGrad.addColorStop(0.6, &#x27;#bae6fd&#x27;);
-      bgGrad.addColorStop(1, &#x27;#e0f2fe&#x27;);
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      drawScenery();
-      updateAndDrawBgParticles();
-      drawTerrain();
+      paintCachedWorld();
+      drawPitWarning();
       drawCoverRocks();
       drawMountainFlag();
       drawPreviousTrajectory();
@@ -2939,11 +3028,6 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       for(let k=0;k&lt;34;k++){
         const x=(k+.4+noise1(k+5)*.3)/34*w,top=getTerrainY(x),size=7+noise1(k+98)*15;
         if(top&lt;pitLimit()-size*.8)drawRock(x,top+size*.25,size,noise1(k+241));
-      }
-      if(Object.keys(fallingTanks).length || performance.now()&lt;pitWarningUntil){
-        ctx.save();ctx.font=&#x27;900 19px Pretendard,sans-serif&#x27;;ctx.textAlign=&#x27;center&#x27;;
-        ctx.strokeStyle=&#x27;#331217&#x27;;ctx.lineWidth=5;ctx.fillStyle=&#x27;#ffe29a&#x27;;
-        ctx.strokeText(&#x27;⚠ 지반 붕괴! 추락 위험&#x27;,w/2,h*.18);ctx.fillText(&#x27;⚠ 지반 붕괴! 추락 위험&#x27;,w/2,h*.18);ctx.restore();
       }
     }
     function drawRock(x,y,r,seed){
@@ -3325,14 +3409,17 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     function gameLoop(now=0) {
       const dt=lastFrameTime?Math.min(50,now-lastFrameTime):16.7;
       lastFrameTime=now;
-      animateMovement(dt);
-      animateFalls(dt);
-      draw();
+      if(document.visibilityState===&#x27;visible&#x27; &amp;&amp; canvas.getClientRects().length){
+        animateMovement(dt);
+        animateFalls(dt);
+        draw();
+      }
       requestAnimationFrame(gameLoop);
     }
 
 
     // ===== Classroom-versus-classroom real-time mode =====
+    let fortressSoloClassName=&#x27;1학년 3반&#x27;;
     let onlineRole=null,onlineReady=false,onlineRemoteExecuting=false,onlineApplying=false,onlineCommandPending=false;
     let onlineFinalPending=null, onlineApplyTimer=null, onlineWinnerName=null;
     function onlineBridge(){try{return window.parent.fortressOnlineBridge||null}catch(e){return null}}
@@ -3360,9 +3447,10 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       ++animationToken;
       isFiring=false;isAiming=false;movementState=null;activeShot=null;projectiles=[];
       debris=[];particles=[];explosions=[];fallingTanks={};
-      canvas.width=960;canvas.height=600;
+      canvas.width=960;canvas.height=600;invalidateFortressScene();
       landscapeSeed=s.landscapeSeed;
       terrainPoints=Array.isArray(s.terrainPoints)?s.terrainPoints.map(p=&gt;({x:p.x,y:p.y,broken:!!p.broken})):[];
+      invalidateFortressScene();
       tanks=JSON.parse(JSON.stringify(s.tanks));
       ammo=JSON.parse(JSON.stringify(s.ammo));
       coverRocks=JSON.parse(JSON.stringify(s.coverRocks||[]));
@@ -3422,7 +3510,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       document.body.classList.remove(&#x27;fortress-role-&#x27;+(role===&#x27;P1&#x27;?&#x27;p2&#x27;:&#x27;p1&#x27;),&#x27;online-ready&#x27;);
       document.getElementById(&#x27;mode-label&#x27;).textContent=&#x27;학급간 실시간&#x27;;
       clearTimeout(itemTimer);clearTimeout(aiItemTimer);
-      canvas.width=960;canvas.height=600;
+      canvas.width=960;canvas.height=600;invalidateFortressScene();
       if(role===&#x27;P1&#x27;){
         tanks.P1.name=hostClass;tanks.P2.name=guestClass||&#x27;상대 반&#x27;;
         resetGame();
@@ -3441,10 +3529,23 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       onlineReady=true;document.body.classList.add(&#x27;online-ready&#x27;);
       onlinePublish();syncUIWithTurn();
     }
+    function fortressSetSoloClass(name){
+      const clean=String(name||&#x27;&#x27;).trim().slice(0,40);
+      if(!clean)return;
+      fortressSoloClassName=clean;
+      if(!onlineRole){
+        tanks.P1.name=clean;
+        document.getElementById(&#x27;game-class-title&#x27;).textContent=clean;
+        document.getElementById(&#x27;p1-name-label&#x27;).textContent=clean;
+        syncUIWithTurn();
+      }
+    }
     function fortressLeaveOnline(){
       onlineRole=null;onlineReady=false;onlineCommandPending=false;
       document.body.classList.remove(&#x27;fortress-online&#x27;,&#x27;fortress-role-p1&#x27;,&#x27;fortress-role-p2&#x27;,&#x27;online-ready&#x27;);
-      isAiMode=true;tanks.P1.name=&#x27;1학년 3반&#x27;;tanks.P2.name=&#x27;AI 보트&#x27;;
+      isAiMode=true;tanks.P1.name=fortressSoloClassName;tanks.P2.name=&#x27;AI 보트&#x27;;
+      document.getElementById(&#x27;game-class-title&#x27;).textContent=fortressSoloClassName;
+      document.getElementById(&#x27;p1-name-label&#x27;).textContent=fortressSoloClassName;
       document.getElementById(&#x27;mode-label&#x27;).textContent=&#x27;VS AI 모드&#x27;;
       resizeCanvas();resetGame();
     }
@@ -5428,6 +5529,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
     function fortressFrameLoaded(){
       const frame=fortressIframe();
       if(!frame)return;
+      try{frame.fortressSetSoloClass?.(state.className);}catch(err){console.warn('포트리스 학급명 적용 실패',err);}
       if(activeGameCenterTab==='fortress')resizeFortressFrame();
       if(!fortressRole||!fortressLatestRoom||typeof frame.fortressEnterOnline!=='function')return;
       try{
@@ -5473,6 +5575,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
         } else btn.className = 'flex-1 min-w-[150px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold px-4 py-3 rounded-xl text-sm transition';
       });
       if (game === 'fortress') {
+        try{fortressIframe()?.fortressSetSoloClass?.(state.className);}catch(err){}
         requestAnimationFrame(() => { resizeFortressFrame(); setTimeout(resizeFortressFrame, 180); });
       }
     }
@@ -7737,6 +7840,7 @@ header nav button { padding-top: .34rem !important; padding-bottom: .34rem !impo
       if (!newClassName) return;
       clearStartupClassSelectionTimer();
       state.className = newClassName;
+      try{fortressIframe()?.fortressSetSoloClass?.(newClassName);}catch(err){}
       localStorage.setItem('daechang_last_class', newClassName);
       loadStateLocally();
       state.className = newClassName;
